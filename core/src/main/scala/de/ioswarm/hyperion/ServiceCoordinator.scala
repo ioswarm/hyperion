@@ -1,7 +1,7 @@
 package de.ioswarm.hyperion
 
 import akka.NotUsed
-import akka.actor.{ActorPath, ActorRef}
+import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.http.scaladsl.server.Route
 
 /**
@@ -35,7 +35,7 @@ private[hyperion] final class ServiceCoordinator(service: Service[NotUsed]) exte
       } else log.info("Wait for {}", diff.mkString(", "))
   }
 
-  protected def createHttpService(hostname: String, port: Int, services: Set[(Service[_], ActorRef)]): Unit = {
+  protected def createHttpService(hostname: String, port: Int, services: Set[(DefaultService[Any], ActorRef)]): Unit = {
     if (services.nonEmpty) {
       import akka.http.scaladsl.server.Directives._
 
@@ -51,7 +51,7 @@ private[hyperion] final class ServiceCoordinator(service: Service[NotUsed]) exte
 
   def subsequentReceive: Receive = {
     case StartSubsequentServices =>
-      createHttpService("localhost", 9000, serviceRefs.filter(ref => ref._1.hasRoute))
+      createHttpService("localhost", 9000, serviceRefs.filter(_._1.isInstanceOf[DefaultService[_]]).map(t => (t._1.asInstanceOf[DefaultService[Any]], t._2)) .filter(ref => ref._1.hasRoute))
 
       val reaper = context.actorOf(ServiceReaper.props(self), "reaper")
       serviceRefs.foreach(t => reaper ! WatchService(t._2))
@@ -60,10 +60,12 @@ private[hyperion] final class ServiceCoordinator(service: Service[NotUsed]) exte
 
   }
 
-  def runtimeReceive: Receive = {
+  override def runtimeReceive: Receive = {
     case Stop =>
       serviceRefs.foreach(t => t._2 ! Stop)
   }
 
   override def receive: Receive = startupReceive
+
+  override def serviceReceive: Receive = Actor.emptyBehavior
 }

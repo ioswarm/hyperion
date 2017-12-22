@@ -9,7 +9,7 @@ import akka.actor.{Actor, ActorRef}
   */
 trait DefaultServiceApply {
 
-  private def createDefaultService(name: String, children: Service[_]*)(f: Service.ServiceReceive): Service[NotUsed] = DefaultService(name, f, Service.emptyRoute, children.toList)
+  private def createDefaultService(name: String, children: Service[_]*)(f: Service.ServiceReceive): Service[NotUsed] = Service.default(name, f, Service.emptyRoute, children.toList)
 
   def create(name: String)(f: Service.ServiceReceive): Service[NotUsed] = createDefaultService(name)(f)
 

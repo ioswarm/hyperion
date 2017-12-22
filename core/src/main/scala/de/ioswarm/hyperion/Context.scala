@@ -20,6 +20,8 @@ private[hyperion] class Context(actorContext: ActorContext, actorLogger: Logging
     }
   }
 
+  def sender(): ActorRef = context.sender()
+
 }
 
 private[hyperion] class MaterializedContext(actorContext: ActorContext, actorLogger: LoggingAdapter) extends Context(actorContext, actorLogger) {

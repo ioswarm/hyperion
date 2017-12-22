@@ -121,7 +121,7 @@ trait Hyperion {
 
   def name: String = system.name
   def system: ActorSystem
-  def run(services: Service[_]*): ActorRef
+  def start(services: Service[_]*): ActorRef
   def stop(): Unit
 
   def terminate(): Future[Terminated] = {
@@ -144,7 +144,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
     , children = services
   )
 
-  override def run(services: Service[_]*): ActorRef = {
+  override def start(services: Service[_]*): ActorRef = {
     if (hyperionActor.isEmpty) {
       val service = hyperionService(services)
       val ref = system.actorOf(service.props, service.name)
