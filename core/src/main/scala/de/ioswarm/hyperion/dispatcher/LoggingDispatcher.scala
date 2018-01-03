@@ -1,18 +1,15 @@
 package de.ioswarm.hyperion.dispatcher
 
 import akka.actor.{Actor, ActorLogging}
-import akka.cluster.Cluster
 import akka.event.Logging._
 
 final class LoggingDispatcher extends Actor with ActorLogging {
 
-  import de.ioswarm.hyperion.model.LogEntry._
+  import de.ioswarm.hyperion.model.LogEvent._
 
   private val events = context.system.eventStream
 
-//  val cluster = Cluster(context.system)
   val systemName: String = context.system.name
-//  val address: String = cluster.selfAddress.toString
 
   def receive: Receive = {
     case InitializeLogger(_) =>

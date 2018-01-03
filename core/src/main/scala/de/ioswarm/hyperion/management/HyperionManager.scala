@@ -7,12 +7,12 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import de.ioswarm.hyperion.{ManagerService, ServiceActor}
 import de.ioswarm.hyperion.Hyperion._
-import de.ioswarm.hyperion.model.LogEntry
+import de.ioswarm.hyperion.model.LogEvent
 
 object HyperionManager {
 
   case class GetLogs(logType: String)
-  case class Logs(logs: Vector[LogEntry])
+  case class Logs(logs: Vector[LogEvent])
 
 }
 class HyperionManager() extends ManagerService {
@@ -71,10 +71,10 @@ final class HyperionManagementService extends ServiceActor {
   val logMax = 1000 // TODO configure log-max-entries
   val hyPath: ActorPath = context.system / "hyperion"
   val hyActor: ActorSelection = context.actorSelection(hyPath)
-  var logs: mutable.Queue[LogEntry] = mutable.Queue.empty[LogEntry]
+  var logs: mutable.Queue[LogEvent] = mutable.Queue.empty[LogEvent]
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[LogEntry])
+    context.system.eventStream.subscribe(self, classOf[LogEvent])
   }
 
   override def postStop(): Unit = {
@@ -91,7 +91,7 @@ final class HyperionManagementService extends ServiceActor {
       val repl = sender()
       repl ! Logs(logs.filter(e => e.logType == mod).toVector.reverse)
 
-    case e: LogEntry => logs.enqueueFinite(e, logMax)
+    case e: LogEvent => logs.enqueueFinite(e, logMax)
   }
 
 }

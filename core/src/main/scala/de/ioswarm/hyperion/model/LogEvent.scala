@@ -5,9 +5,9 @@ import Argonaut._
 import java.io.{PrintWriter, StringWriter}
 import java.time.{Instant, LocalDateTime, ZoneId}
 
-object LogEntry {
+object LogEvent {
 
-  def apply(logType: String, logSource: String, clazz: Class[_], message: Any, cause: Option[Throwable] = None, systemName: Option[String] = None, address: Option[String] = None): LogEntry = LogEntry(
+  def apply(logType: String, logSource: String, clazz: Class[_], message: Any, cause: Option[Throwable] = None, systemName: Option[String] = None, address: Option[String] = None): LogEvent = LogEvent(
     logType
     , LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant
     , logSource
@@ -65,7 +65,7 @@ object LogEntry {
 
   import de.ioswarm.hyperion.json.Codecs._
 
-  implicit def logEntryCodec: CodecJson[LogEntry] = casecodec8(LogEntry.apply, LogEntry.unapply)(
+  implicit def logEntryCodec: CodecJson[LogEvent] = casecodec8(LogEvent.apply, LogEvent.unapply)(
     "type"
     , "timestamp"
     , "source"
@@ -77,14 +77,14 @@ object LogEntry {
   )
 
 }
-case class LogEntry(logType: String
-                    ,timestamp: Instant
-                    ,source: String
-                    ,clazz: String
-                    ,message: String
-                    ,cause: Option[String]
-                    ,systemName: Option[String]
-                    ,address: Option[String]) {
+case class LogEvent(logType: String
+                    , timestamp: Instant
+                    , source: String
+                    , clazz: String
+                    , message: String
+                    , cause: Option[String]
+                    , systemName: Option[String]
+                    , address: Option[String]) {
 
   def isERROR: Boolean = logType == "ERROR"
   def isWARN: Boolean = logType == "WARN"
@@ -92,9 +92,9 @@ case class LogEntry(logType: String
   def isDEBUG: Boolean = logType == "DEBUG"
   def isUNKNOWN: Boolean = !(isERROR || isWARN || isINFO || isDEBUG)
 
-  def asERROR: LogEntry = copy(logType = "ERROR")
-  def asWARN: LogEntry = copy(logType = "WARN")
-  def asINFO: LogEntry = copy(logType = "INFO")
-  def asDEBUG: LogEntry = copy(logType = "WARN")
+  def asERROR: LogEvent = copy(logType = "ERROR")
+  def asWARN: LogEvent = copy(logType = "WARN")
+  def asINFO: LogEvent = copy(logType = "INFO")
+  def asDEBUG: LogEvent = copy(logType = "WARN")
 
 }

@@ -39,7 +39,7 @@ lazy val core = project.in(file("core"))
       , lib.argonaut
       , lib.akkaHttpArgonaut
 
-  //		, lib.sigarLoader
+  		, lib.sigarLoader
     )
   )
   .enablePlugins(
