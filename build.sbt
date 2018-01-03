@@ -1,7 +1,7 @@
 lazy val settings = Seq(
 	name := "hyperion"
 	, organization := "de.ioswarm"
-	, version := "0.1.0"
+	, version := "0.2.0"
 	, scalaVersion := "2.12.3"
 	, scalacOptions ++= Seq(
 		"-language:_"
@@ -18,19 +18,9 @@ lazy val hyperion = project.in(file("."))
 		name := "hyperion"
 	)
 	.aggregate(
-		api
-		, core
+		core
 		, auth
 	)
-
-lazy val api = project.in(file("api"))
-  .settings(settings)
-  .settings(
-    name := "hyperion-api"
-    , libraryDependencies ++= Seq(
-
-    )
-  )
 
 lazy val core = project.in(file("core"))
   .settings(settings)
@@ -45,11 +35,12 @@ lazy val core = project.in(file("core"))
       , lib.akkaHttp
       , lib.akkaClusterSharding
       , lib.akkaPersistence
+
+      , lib.argonaut
+      , lib.akkaHttpArgonaut
+
   //		, lib.sigarLoader
     )
-  )
-  .dependsOn(
-    api
   )
   .enablePlugins(
     BoilerplatePlugin
@@ -70,6 +61,9 @@ lazy val lib = new {
 		val akkaHttp = "10.0.10"
 		val akkaPersistenceCassandra = "0.80-RC2"
 
+		val argonaut = "6.2"
+    val akkaHttpArgonaut = "1.15.0"
+
 		val sigarLoader = "1.6.6-rev002"
 	}
 
@@ -82,6 +76,9 @@ lazy val lib = new {
 	val akkaClusterSharding = "com.typesafe.akka" %% "akka-cluster-sharding" % Version.akka
 	val akkaPersistence = "com.typesafe.akka" %% "akka-persistence" % Version.akka
 	val akkaPersistenceCassandra = "com.typesafe.akka" %% "akka-persistence-cassandra" % Version.akkaPersistenceCassandra
+
+  val argonaut = "io.argonaut" %% "argonaut" % Version.argonaut
+  val akkaHttpArgonaut = "de.heikoseeberger" %% "akka-http-argonaut" % Version.akkaHttpArgonaut
 
 	val sigarLoader = "io.kamon" % "sigar-loader" % Version.sigarLoader
 
