@@ -35,11 +35,14 @@ lazy val core = project.in(file("core"))
       , lib.akkaHttp
       , lib.akkaClusterSharding
       , lib.akkaPersistence
+			, lib.akkaPersistenceCassandra
 
       , lib.argonaut
       , lib.akkaHttpArgonaut
 
   		, lib.sigarLoader
+
+      , lib.chill
     )
   )
   .enablePlugins(
@@ -65,6 +68,8 @@ lazy val lib = new {
     val akkaHttpArgonaut = "1.15.0"
 
 		val sigarLoader = "1.6.6-rev002"
+
+    val chill = "0.9.2"
 	}
 
 	val akkaActor = "com.typesafe.akka" %% "akka-actor" % Version.akka
@@ -82,5 +87,6 @@ lazy val lib = new {
 
 	val sigarLoader = "io.kamon" % "sigar-loader" % Version.sigarLoader
 
+  val chill = "com.twitter" %% "chill-akka" % Version.chill
 }
 

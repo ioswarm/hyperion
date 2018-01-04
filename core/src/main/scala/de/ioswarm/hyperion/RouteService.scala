@@ -61,7 +61,7 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
   val binding: Future[Http.ServerBinding] = Http(context.system).bind(interface = host, port = port).to(sink = Sink foreach { conn =>
     val remote = conn.remoteAddress
 
-    conn.handleWith(handleRequest(remote, System.currentTimeMillis(), Route.handlerFlow(route)))
+    conn.handleWith(handleRequest(remote, java.lang.System.currentTimeMillis(), Route.handlerFlow(route)))
   })
     .run() pipeTo self
 

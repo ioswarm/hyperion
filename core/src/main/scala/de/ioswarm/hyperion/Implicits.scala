@@ -10,6 +10,8 @@ object Implicits {
 
     def run(implicit hy: Hyperion): Future[ActorRef] = hy.run(s)
 
+    def asSingleton(implicit hy: Hyperion): Service = SingletonServiceImpl(s)
+
   }
 
   implicit class ActorServiceExtender(a: ActorService) {
@@ -38,6 +40,13 @@ object Implicits {
     def receive(r: ServiceReceive): ActorService = ActorServiceImpl(name = s, receive = r)
 
     def route(r: ServiceRoute): HttpService = HttpServiceImpl(name = s, route = r)
+
+    def forward(p: Props): Service = ForwardServiceImpl(s, p)
+
+    def persist[T]: PersistentService[T] = persist[T](None)
+    def persist[T](t: Option[T]): PersistentService[T] = PersistentServiceImpl[T](name = s, value = t)
+//    def command[T](cmd: CommandReceive[T]): PersistentService[T] = PersistentServiceImpl[T](name = s, commands=List(cmd))
+    def event[T](evt: EventReceive[T]): PersistentService[T] = PersistentServiceImpl[T](name = s, events = List(evt))
 
   }
 

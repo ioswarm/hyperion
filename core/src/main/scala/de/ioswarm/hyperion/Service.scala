@@ -1,13 +1,21 @@
 package de.ioswarm.hyperion
 
 import akka.actor.{Actor, ActorRef, Props}
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
 
+import de.ioswarm.hyperion.Service.{CommandReceive, EventReceive}
+import de.ioswarm.hyperion.model.{Action, Command, Event}
+
+import scala.concurrent.duration.Duration
 
 object Service {
   type ServiceReceive = ServiceContext => Actor.Receive
   type ServiceRoute = ActorRef => Route
+
+  type CommandReceive[T] = Option[T] => PartialFunction[Command, Action[Event]]
+  type EventReceive[T] = Option[T] => PartialFunction[Event, T]
 
   object emptyBehavior extends ServiceReceive {
     override def apply(ctx: ServiceContext): Actor.Receive = Actor.emptyBehavior
@@ -141,5 +149,101 @@ trait ManagerService extends Service {
   type ServiceRoute = Service.ServiceRoute
 
   def route: ServiceRoute
+
+}
+
+// TODO implement singleton-proxy-service
+case class SingletonServiceImpl[T <:Service](service: T)(implicit hy: Hyperion) extends Service {
+  import Hyperion._
+
+  override def name: String = service.name
+
+  override def props: Props = ClusterSingletonManager.props(
+    singletonProps = service.props
+    , terminationMessage = Stop
+    , settings = ClusterSingletonManagerSettings(hy.system)
+  )
+
+}
+
+trait PersistentService[T] extends Service {
+  import Service._
+
+  def value: Option[T]
+  def commands: List[CommandReceive[T]]
+  def events: List[EventReceive[T]]
+  def timeout: Duration
+  def snapshotInterval: Int
+  def dispatcher: Option[String]
+  def actorClass: Class[_ >: PersistentServiceActor[T]]
+  def actorArgs: Seq[Any]
+  def sharded: Boolean
+
+  def withValue(t: Option[T]): PersistentService[T]
+  def withTimeout(d: Duration): PersistentService[T]
+  def withSnapshotInterval(i: Int): PersistentService[T]
+  def withDispatcher(d: String): PersistentService[T]
+  def withActor(c: Class[_ >: PersistentServiceActor[T]]): PersistentService[T]
+  def withArgs(args: Any*): PersistentService[T]
+  def withSharding(b: Boolean): PersistentService[T]
+
+  def command(c: CommandReceive[T]): PersistentService[T]
+  def event(e: EventReceive[T]): PersistentService[T]
+
+  def commandReceive(value: Option[T]): PartialFunction[Command, Action[Event]] = {
+    require(commands.nonEmpty)
+    val first = commands.head
+    commands.aggregate(first(value))( { (p, cmd) => p orElse cmd(value) }, { (p1, p2) => p1 orElse p2 })
+  }
+
+  def eventReceive(value: Option[T]): PartialFunction[Event, T] = {
+    require(events.nonEmpty)
+    val first = events.head
+    events.aggregate(first(value))({(p, evt) => p orElse evt(value)}, {(p1, p2) => p1 orElse p2})
+  }
+
+}
+case class PersistentServiceImpl[T](
+                                   name: String
+                                   , value: Option[T] = None
+                                   , commands: List[CommandReceive[T]] = List.empty[CommandReceive[T]]
+                                   , events: List[EventReceive[T]] = List.empty[EventReceive[T]]
+                                   , timeout: Duration = Duration.Inf
+                                   , snapshotInterval: Int = Int.MaxValue
+                                   , dispatcher: Option[String] = None
+                                   , actorClass: Class[_ >: PersistentServiceActor[T]] = classOf[PersistentServiceActor[T]]
+                                   , actorArgs: Seq[Any] = Seq.empty[Any]
+                                   , sharded: Boolean = false
+                                   ) extends PersistentService[T] {
+
+  require(snapshotInterval >= 0)
+
+  override def withValue(t: Option[T]): PersistentService[T] = copy(value = t)
+
+  override def withTimeout(d: Duration): PersistentService[T] = copy(timeout = d)
+
+  override def withSnapshotInterval(i: Int): PersistentService[T] = {
+    require(snapshotInterval >= 0)
+
+    copy(snapshotInterval = i)
+  }
+
+  override def withDispatcher(d: String): PersistentService[T] = copy(dispatcher = Some(d))
+
+  override def withActor(c: Class[_ >: PersistentServiceActor[T]]): PersistentService[T] = copy(actorClass = c)
+
+  override def withArgs(args: Any*): PersistentService[T] = copy(actorArgs = args)
+
+  override def withSharding(b: Boolean): PersistentService[T] = copy(sharded = b)
+
+  override def command(cmd: CommandReceive[T]): PersistentService[T] = copy(commands = cmd +: this.commands)
+
+  override def event(evt: EventReceive[T]): PersistentService[T] = copy(events = evt +: events)
+
+  override def props: Props = {
+    val p = Props(actorClass, this +: actorArgs :_*)
+    if (dispatcher.isDefined) p.withDispatcher(dispatcher.get)
+    else p
+  }
 
 }

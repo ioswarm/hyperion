@@ -1,7 +1,10 @@
 package de.ioswarm.hyperion
 
-import akka.actor.{Actor, ActorLogging, ActorPath, ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
+import akka.cluster.sharding.ShardRegion.Passivate
+import akka.persistence.{PersistentActor, SnapshotOffer}
 import com.typesafe.config.Config
+import de.ioswarm.hyperion.model.{Command, Event}
 
 trait ServiceActor extends Actor with ActorLogging {
 
@@ -140,5 +143,67 @@ class ActorServiceActor(service: ActorService) extends ServiceActor {
   }
 
   def serviceReceive: Receive = service.receive(serviceContext)
+
+}
+
+class PersistentServiceActor[T](service: PersistentService[T]) extends PersistentActor with ActorLogging {
+
+  import Hyperion._
+
+  val snapshotInterval: Int = service.snapshotInterval
+  var value: Option[T] = service.value
+
+  context.setReceiveTimeout(service.timeout)
+
+  def canRegister: Boolean = !service.sharded
+  def register(ref: ActorRef): Unit = if (canRegister) context.actorSelection(context.system / "hyperion") ! Register(ref)
+  def registerSelf(): Unit = register(self)
+
+  def receiveEvent(value: Option[T], evt: Event): Option[T] = {
+    val x = service.eventReceive(value)(evt)
+    log.debug("Receive-Event {} - old-value: {} - new-value: {}", evt, value, x)
+    Some(x)
+  }
+
+  override def persistenceId: String = self.path.name
+
+  override def receiveRecover: Receive = {
+    case evt: Event =>
+      value = receiveEvent(value, evt)
+    case SnapshotOffer(_, snapshot: Any) =>
+      log.debug("Recover snapshot: {}", snapshot)
+      value = Some(snapshot.asInstanceOf[T])
+  }
+
+  override def receiveCommand: Receive = {
+    case cmd: Command =>
+      val action =  service.commandReceive(value)(cmd)
+      if (action.isPersistable) {
+        persist(action.taggedValue) { evt =>
+          log.debug("TAGGED: "+evt)
+          value = receiveEvent(value, evt.payload.asInstanceOf[Event])
+          if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
+            saveSnapshot(value.get)
+          if (action.isReplyable) sender() ! evt.payload.asInstanceOf[Event]
+        }
+      } else if (action.isReplyable) sender() ! action.value
+    case ReceiveTimeout =>
+      log.debug("Receive timeout ... passivate persistenceId: "+persistenceId)
+      if (service.sharded) context.parent ! Passivate(stopMessage = Stop)
+      else self ! Stop
+    case Initialize =>
+      log.debug("Initialize persistent-service {} at {}", self.path.name, self.path)
+      val repl = sender()
+      log.debug("Persistent-service {} at {} initialized.", self.path.name, self.path)
+      registerSelf()
+      repl ! Initialized(self)
+    case Stop =>
+      log.debug("Persistent-service {} at {} shutting down...", self.path.name, self.path)
+      val repl = sender()
+      context.stop(self)
+      log.debug("Persistent-service {} at {} is down.", self.path.name, self.path)
+      if (!service.sharded) repl ! Stopped(self)
+
+  }
 
 }

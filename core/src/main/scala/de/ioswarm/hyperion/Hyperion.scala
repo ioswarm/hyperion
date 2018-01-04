@@ -4,7 +4,6 @@ import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import de.ioswarm.hyperion.dispatcher.MetricsDispatcher
 
 import scala.concurrent.Future
 
@@ -59,7 +58,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
   private def hyperionService(services: Service*) = ActorServiceImpl(name = "hyperion", children = System(config) +: Management(config) +: services)
 
   override def run(service: Service): Future[ActorRef] = {
-    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure service-startup-timeout
+    implicit val timeout: Timeout = Timeout(60.seconds)  // TODO configure service-startup-timeout
 
     hyperionActor match {
       case Some(ref) => for {
@@ -77,7 +76,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
       Future.successful(ref)
     case None =>
       hyperionActor = Some(system.actorOf(Props(classOf[HyperionActor], hyperionService(services :_*)), "hyperion"))
-      implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure system-startup-timeout
+      implicit val timeout: Timeout = Timeout(60.seconds)  // TODO configure system-startup-timeout
       hyperionActor match {
         case Some(ref) => for {
           res <- ref ? Initialize
@@ -89,7 +88,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
   }
 
   override def stop(): Future[Done] = {
-    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure service-stop-timeout
+    implicit val timeout: Timeout = Timeout(60.seconds)  // TODO configure service-stop-timeout
 
     hyperionActor match {
       case Some(ref) => for {
