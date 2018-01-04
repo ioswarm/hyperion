@@ -1,24 +1,27 @@
 package de.ioswarm.hyperion.dispatcher
 
-import akka.actor.Props
+import java.time.{LocalDateTime, ZoneId}
+
+import akka.actor.{Address, Props}
 import akka.cluster.Cluster
 import akka.cluster.metrics.{ClusterMetricsChanged, ClusterMetricsExtension}
+import akka.event.EventStream
+import de.ioswarm.hyperion.model.MetricEvent
 import de.ioswarm.hyperion.{Service, ServiceActor}
 
-object MetricsDispatcher {
+class MetricsDispatcher() extends Service {
 
-  def apply(): Service = new Service {
+  override def name: String = "metrics"
 
-    override def name: String = "metrics"
-
-    override def props: Props = Props[MetricsDispatcher]
-  }
+  override def props: Props = Props[MetricsDispatcherService]
 
 }
-class MetricsDispatcher extends ServiceActor {
+class MetricsDispatcherService extends ServiceActor {
 
-  private val cluster = Cluster(context.system)
-  private val address = cluster.selfAddress
+  val events: EventStream = context.system.eventStream
+  val cluster = Cluster(context.system)
+  val address: Address = cluster.selfAddress
+  val systemName: String = context.system.name
 
 
   val metricsExt = ClusterMetricsExtension(context.system)
@@ -33,7 +36,19 @@ class MetricsDispatcher extends ServiceActor {
 
   override def serviceReceive: Receive = {
     case ClusterMetricsChanged(metrics) =>
-      log.info(metrics.toString())
+      metrics.filter(_.address == address) foreach { nodeMetrics =>
+        val evt = MetricEvent(LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant
+          , nodeMetrics.metric("heap-memory-used").map(_.value.doubleValue())
+          , nodeMetrics.metric("heap-memory-max").map(_.value.doubleValue())
+          , nodeMetrics.metric("cpu-combined").map(_.value.doubleValue())
+          , nodeMetrics.metric("processors").map(_.value.doubleValue())
+          , nodeMetrics.metric("system-load-average").map(_.value.doubleValue())
+          , nodeMetrics.metric("heap-memory-committed").map(_.value.doubleValue())
+          , nodeMetrics.metric("cpu-stolen").map(_.value.doubleValue())
+          , Option(systemName)
+          , Option(nodeMetrics.address.toString))
+        events.publish(evt)
+      }
   }
 
 }

@@ -1,25 +1,36 @@
 package de.ioswarm.hyperion.dispatcher
 
-import akka.actor.{Actor, ActorLogging}
-import akka.event.Logging._
+import akka.actor.{Address, Props}
+import akka.cluster.Cluster
+import akka.event.EventStream
+import de.ioswarm.hyperion.model.{LogEntry, LogEvent}
+import de.ioswarm.hyperion.{Service, ServiceActor}
 
-final class LoggingDispatcher extends Actor with ActorLogging {
+class LoggingDispatcher() extends Service {
 
-  import de.ioswarm.hyperion.model.LogEvent._
+  override def name: String = "logging"
 
-  private val events = context.system.eventStream
+  override def props: Props = Props[LoggingDispatcherService]
 
+}
+class LoggingDispatcherService extends ServiceActor {
+
+  val events: EventStream = context.system.eventStream
+  val cluster = Cluster(context.system)
+  val address: Address = cluster.selfAddress
   val systemName: String = context.system.name
 
-  def receive: Receive = {
-    case InitializeLogger(_) =>
-      log.debug("LoggingDispatcher initialized.")
-      sender() ! LoggerInitialized
-    case Error(cause, logSource, logClass, message) => events.publish(ERROR(logSource, logClass, message, Some(cause), Some(systemName), None))
-    case Warning(logSource, logClass, message) => events.publish(WARN(logSource, logClass, message, None, Some(systemName), None))
-    case Info(logSource, logClass, message) => events.publish(INFO(logSource, logClass, message, None, Some(systemName), None))
-    case Debug(logSource, logClass, message) => events.publish(DEBUG(logSource, logClass, message, None, Some(systemName), None))
-    case _ =>
+  override def preStart(): Unit = {
+    events.subscribe(self, classOf[LogEntry])
+  }
+
+  override def postStop(): Unit = {
+    events.unsubscribe(self)
+  }
+
+  override def serviceReceive: Receive = {
+    case e: LogEntry =>
+      events.publish(LogEvent(e, Some(systemName), Some(address.toString)))
   }
 
 }
