@@ -72,14 +72,20 @@ class ActorServiceActor(service: ActorService) extends ServiceActor {
   def childPaths: List[ActorPath] = childServiceMap.keySet.map(ref => ref.path).toList
 
   def startChildService(service: Service): Future[ServiceStarted] = {
-    val ref = context.actorOf(service.props, service.name)
+    //val ref = context.actorOf(service.props, service.name)
+    val ref = service.createActor
     log.debug("Start child-service {} at {}", service.name, ref.path)
-    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure service-start-timeout
-    ref ? Initialize map {
-      case Initialized(xref) =>
-        log.debug("Child-service {} at {} started", service.name, xref.path)
-        childServiceMap += xref -> service
-        ServiceStarted(service, xref)
+    if (service.initialize) {
+      implicit val timeout: Timeout = Timeout(10.seconds) // TODO configure service-start-timeout
+      ref ? Initialize map {
+        case Initialized(xref) =>
+          log.debug("Child-service {} at {} started", service.name, xref.path)
+          childServiceMap += xref -> service
+          ServiceStarted(service, xref)
+      }
+    } else {
+      childServiceMap += ref -> service
+      Future.successful(ServiceStarted(service, ref))
     }
   }
 

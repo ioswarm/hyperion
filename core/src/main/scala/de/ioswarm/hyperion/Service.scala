@@ -1,7 +1,8 @@
 package de.ioswarm.hyperion
 
-import akka.actor.{Actor, ActorRef, Props}
-import akka.cluster.sharding.ShardRegion
+import akka.actor.{Actor, ActorContext, ActorRef, Props}
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
+import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
@@ -17,10 +18,10 @@ object Service {
   type CommandReceive[T] = Option[T] => PartialFunction[Command, Action[Event]]
   type EventReceive[T] = Option[T] => PartialFunction[Event, T]
 
-  val defaultIdExtractor: ShardRegion.ExtractEntityId = {
+  val defaultExtractEntityId: ShardRegion.ExtractEntityId = {
     case cmd: Command => (cmd.id, cmd)
   }
-  val defaultShardResolver: ShardRegion.ExtractShardId = {
+  val defaultExtractShardId: ShardRegion.ExtractShardId = {
     case cmd: Command => (math.abs(cmd.id.hashCode) % 100).toString
   }
 
@@ -38,6 +39,10 @@ trait Service {
 
   def name: String
   def props: Props
+
+  def initialize: Boolean = true
+
+  def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(props, name)
 
 }
 
@@ -169,6 +174,29 @@ case class SingletonServiceImpl[T <:Service](service: T)(implicit hy: Hyperion) 
     singletonProps = service.props
     , terminationMessage = Stop
     , settings = ClusterSingletonManagerSettings(hy.system)
+  )
+
+}
+
+// TODO implement cluster-sharding-proxy-service
+case class ShardingServiceImpl[T <: Service](
+                                              service: T
+                                              , entityIdExtract: ExtractEntityId = Service.defaultExtractEntityId
+                                              , shardIdExtract: ExtractShardId = Service.defaultExtractShardId
+                                            ) extends Service {
+
+  override def name: String = service.name
+
+  override def props: Props = service.props
+
+  override def initialize: Boolean = false
+
+  override def createActor(implicit ac: ActorContext): ActorRef = ClusterSharding(ac.system).start(
+    typeName = name
+    , entityProps = props
+    , settings = ClusterShardingSettings(ac.system)
+    , extractEntityId = entityIdExtract
+    , extractShardId = shardIdExtract
   )
 
 }
