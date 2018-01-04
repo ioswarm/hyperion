@@ -1,10 +1,10 @@
 package de.ioswarm.hyperion
 
 import akka.actor.{Actor, ActorRef, Props}
+import akka.cluster.sharding.ShardRegion
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
-
 import de.ioswarm.hyperion.Service.{CommandReceive, EventReceive}
 import de.ioswarm.hyperion.model.{Action, Command, Event}
 
@@ -16,6 +16,13 @@ object Service {
 
   type CommandReceive[T] = Option[T] => PartialFunction[Command, Action[Event]]
   type EventReceive[T] = Option[T] => PartialFunction[Event, T]
+
+  val defaultIdExtractor: ShardRegion.ExtractEntityId = {
+    case cmd: Command => (cmd.id, cmd)
+  }
+  val defaultShardResolver: ShardRegion.ExtractShardId = {
+    case cmd: Command => (math.abs(cmd.id.hashCode) % 100).toString
+  }
 
   object emptyBehavior extends ServiceReceive {
     override def apply(ctx: ServiceContext): Actor.Receive = Actor.emptyBehavior
@@ -224,7 +231,6 @@ case class PersistentServiceImpl[T](
 
   override def withSnapshotInterval(i: Int): PersistentService[T] = {
     require(snapshotInterval >= 0)
-
     copy(snapshotInterval = i)
   }
 
