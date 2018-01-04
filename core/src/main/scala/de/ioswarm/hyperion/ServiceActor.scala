@@ -39,17 +39,25 @@ trait ServiceActor extends Actor with ActorLogging {
 
 }
 
-private[hyperion] class ForwardServiceActor(props: Props) extends ServiceActor {
+private[hyperion] class PropsForwardServiceActor(props: Props) extends ServiceActor {
 
-  val actorRef: ActorRef = context.actorOf(props)
+  val ref: ActorRef = context.actorOf(props)
 
   override def registerSelf(): Unit = {
     register(self)
-    register(actorRef)
+    register(ref)
   }
 
   def serviceReceive: Receive = {
-    case a: Any => actorRef forward a
+    case a: Any => ref forward a
+  }
+
+}
+
+private[hyperion] class ActorRefForwardServiceActor(ref: ActorRef) extends ServiceActor {
+
+  def serviceReceive: Receive = {
+    case a: Any => ref forward a
   }
 
 }

@@ -46,9 +46,15 @@ trait Service {
 
 }
 
-case class ForwardServiceImpl(name: String, actorProps: Props) extends Service {
+case class PropsForwardServiceImpl(name: String, actorProps: Props) extends Service {
 
-  def props: Props = Props(classOf[ForwardServiceActor], actorProps)
+  def props: Props = Props(classOf[PropsForwardServiceActor], actorProps)
+
+}
+
+case class ActorRefForwardServiceImpl(name: String, ref: ActorRef) extends Service {
+
+  def props: Props = Props(classOf[ActorRefForwardServiceActor], ref)
 
 }
 
@@ -189,15 +195,17 @@ case class ShardingServiceImpl[T <: Service](
 
   override def props: Props = service.props
 
-  override def initialize: Boolean = false
+//  override def initialize: Boolean = false
 
-  override def createActor(implicit ac: ActorContext): ActorRef = ClusterSharding(ac.system).start(
-    typeName = name
-    , entityProps = props
-    , settings = ClusterShardingSettings(ac.system)
-    , extractEntityId = entityIdExtract
-    , extractShardId = shardIdExtract
-  )
+  override def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(Props(classOf[ActorRefForwardServiceActor]
+    , ClusterSharding(ac.system).start(
+      typeName = name
+      , entityProps = props
+      , settings = ClusterShardingSettings(ac.system)
+      , extractEntityId = entityIdExtract
+      , extractShardId = shardIdExtract
+    ))
+    , name)
 
 }
 
