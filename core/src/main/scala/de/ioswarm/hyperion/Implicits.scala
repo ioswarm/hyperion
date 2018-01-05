@@ -11,6 +11,8 @@ object Implicits {
 
     def run(implicit hy: Hyperion): Future[ActorRef] = hy.run(s)
 
+    def route(route: Service.ServiceRoute): HttpService = HttpServiceImpl(s, route)
+
     def asSingleton(implicit hy: Hyperion): Service = SingletonServiceImpl(s)
 
   }
@@ -19,7 +21,7 @@ object Implicits {
 
     import Service._
 
-    def route(r: ServiceRoute): HttpService = HttpServiceImpl(
+    /*def route(r: ServiceRoute): HttpService = HttpServiceImpl(
       a.name
       , a.receive
       , r
@@ -28,7 +30,7 @@ object Implicits {
       , a.actorClass
       , a.actorArgs
       , a.children
-    )
+    )*/
 
     def sharding(entityIdExtract: ExtractEntityId = Service.defaultExtractEntityId
                  , shardIdExtract: ExtractShardId = Service.defaultExtractShardId): ShardingServiceImpl[ActorService] = ShardingServiceImpl(
@@ -60,7 +62,7 @@ object Implicits {
 
     def receive(r: ServiceReceive): ActorService = ActorServiceImpl(name = s, receive = r)
 
-    def route(r: ServiceRoute): HttpService = HttpServiceImpl(name = s, route = r)
+//    def route(r: ServiceRoute): HttpService = HttpServiceImpl(name = s, route = r)
 
     def forward(p: Props): Service = PropsForwardServiceImpl(s, p)
 

@@ -120,7 +120,7 @@ case class ActorServiceImpl(
 
 }
 
-trait HttpService extends ActorService {
+/*trait HttpService extends ActorService {
   type ServiceRoute = Service.ServiceRoute
 
   def route: ServiceRoute
@@ -161,6 +161,27 @@ case class HttpServiceImpl(
 
   def withRoute[T >: HttpService](r: ServiceRoute): T = copy(route = r)
 
+}*/
+
+trait HttpService extends Service {
+  type ServiceRoute = Service.ServiceRoute
+
+  def service: Service
+  def route: ServiceRoute
+
+  def hasRoute: Boolean = route != Service.emptyRoute
+
+  def withRoute[T >: HttpService](route: ServiceRoute): T
+  def route[T >: HttpService](route: ServiceRoute): T = withRoute(route)
+}
+
+case class HttpServiceImpl(service: Service, route: Service.ServiceRoute = Service.emptyRoute) extends HttpService {
+
+  override def name: String = service.name
+
+  override def props: Props = service.props
+
+  def withRoute[T >: HttpService](r: ServiceRoute): T = copy(route = r)
 }
 
 trait ManagerService extends Service {
