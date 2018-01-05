@@ -46,7 +46,7 @@ lazy val core = project.in(file("core"))
     )
   )
   .enablePlugins(
-    BoilerplatePlugin
+		spray.boilerplate.BoilerplatePlugin
   )
 
 lazy val auth = project.in(file("auth"))

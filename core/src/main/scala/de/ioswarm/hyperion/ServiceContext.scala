@@ -13,10 +13,10 @@ class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
   def config: Config = context.system.settings.config
 
   def actorOf(service: Service): ActorRef = {
-    log.info(s"Start child-actor '${service.name}'")
+    log.debug(s"Context start child-actor '${service.name}'")
     context.child(service.name) match {
       case Some(ref) => ref
-      case None => context.actorOf(service.props, service.name)
+      case None => service.createActor(actorContext)
     }
   }
 

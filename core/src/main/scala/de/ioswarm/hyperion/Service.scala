@@ -192,16 +192,18 @@ trait ManagerService extends Service {
 }
 
 // TODO implement singleton-proxy-service
-case class SingletonServiceImpl[T <:Service](service: T)(implicit hy: Hyperion) extends Service {
+case class SingletonServiceImpl[T <:Service](service: T) extends Service {
   import Hyperion._
 
   override def name: String = service.name
 
-  override def props: Props = ClusterSingletonManager.props(
-    singletonProps = service.props
+  override def props: Props = service.props
+
+  override def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(ClusterSingletonManager.props(
+    singletonProps = props
     , terminationMessage = Stop
-    , settings = ClusterSingletonManagerSettings(hy.system)
-  )
+    , settings = ClusterSingletonManagerSettings(ac.system)
+  ), name)
 
 }
 
