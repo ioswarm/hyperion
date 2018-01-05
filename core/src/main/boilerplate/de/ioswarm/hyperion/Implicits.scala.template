@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
 
 import scala.concurrent.Future
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 
 object Implicits {
 
@@ -32,7 +32,7 @@ object Implicits {
     implicit class PersistentServiceExtender[T](p: PersistentService[T]) {
 
       def sharding(entityIdExtract: ExtractEntityId = Service.defaultExtractEntityId
-                   , shardIdExtract: ExtractShardId = Service.defaultExtractShardId)(implicit tu: Duration): ShardingServiceImpl[PersistentService[T]] = ShardingServiceImpl(
+                   , shardIdExtract: ExtractShardId = Service.defaultExtractShardId)(implicit tu: Duration = 300.seconds): ShardingServiceImpl[PersistentService[T]] = ShardingServiceImpl(
         p.withSharding(true).withTimeout(tu)
         , entityIdExtract
         , shardIdExtract
