@@ -10,6 +10,7 @@ import akka.stream.{ActorMaterializer, FlowShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Sink, Unzip, Zip}
 import akka.util.Timeout
 import de.ioswarm.hyperion.Hyperion.Stopped
+import de.ioswarm.hyperion.model.HttpMetricEvent
 
 import scala.concurrent.Future
 
@@ -19,12 +20,18 @@ object RouteService {
 
   def apply(host: String, port: Int, route: Route): ActorService = s"route_${host}_$port" receive Service.emptyBehavior withActor classOf[RouteService] withArgs(host, port, route)
 
+  case object Init
+  case object Ack
+  case object Complete
+
 }
 class RouteService(service: ActorService, host: String, port: Int, route: Route) extends ActorServiceActor(service) {
 
   import context.dispatcher
   import akka.actor.Status.Failure
   import akka.http.scaladsl.Http
+  import RouteService._
+  import Hyperion._
 
   implicit val mat: ActorMaterializer = ActorMaterializer()
 
@@ -47,13 +54,16 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
     val uz = b.add(Unzip[HttpRequest, (Long, HttpRequest)])
     val bc = b.add(Broadcast[HttpResponse](2))
     val zip = b.add(Zip[(Long, HttpRequest), HttpResponse])
+    val metric = b.add(Flow[((Long, HttpRequest), HttpResponse)].map{ m =>
+      HttpMetricEvent(m._1._1, m._1._2, Some(java.lang.System.currentTimeMillis()), Some(m._2))
+    })
 
 
     req ~> uz.in
     uz.out0 ~> hdl ~> bc
     bc.out(1) ~> zip.in1
     uz.out1 ~> zip.in0
-    zip.out ~> Sink.foreach(println) //TODO HTTP-Metric-Adapter
+    zip.out ~> metric ~> Sink.actorRefWithAck(self, Init, Ack, Complete)
 
     FlowShape(req.in, bc.out(0))
   })
@@ -77,6 +87,13 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
     case Failure(e) =>
       log.error(e, "Route-service {} at {} could not bind to {}:{} ... stop self", service.name, self.path, host, port)
       context.stop(self)
+
+    case Init => sender() ! Ack
+    case m: HttpMetricEvent =>
+      val repl = sender()
+      context.system.eventStream.publish(m)
+      repl ! Ack
+    case Complete => // DO NOTHING JET
 
   }
 

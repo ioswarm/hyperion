@@ -7,7 +7,7 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import de.ioswarm.hyperion.{ManagerService, ServiceActor}
 import de.ioswarm.hyperion.Hyperion._
-import de.ioswarm.hyperion.model.{LogEvent, MetricEvent}
+import de.ioswarm.hyperion.model.{HttpMetricEvent, LogEvent, MetricEvent}
 
 object HyperionManager {
 
@@ -15,7 +15,10 @@ object HyperionManager {
   case class Logs(logs: Vector[LogEvent])
 
   case object GetMetrics
-  case class Metrics(logs: Vector[MetricEvent])
+  case class Metrics(metrics: Vector[MetricEvent])
+
+  case object GetRequestMetrics
+  case class RequestMetrics(metrics: Vector[HttpMetricEvent])
 
 }
 class HyperionManager() extends ManagerService {
@@ -59,11 +62,23 @@ class HyperionManager() extends ManagerService {
         }
       } ~
       pathPrefix("metrics") {
-        get {
-          pathEnd {
-            onSuccess(ref ? GetMetrics) {
-              case Metrics(metrics) => complete(metrics)
-              case _ => complete(NotFound)
+        pathPrefix("system") {
+          get {
+            pathEnd {
+              onSuccess(ref ? GetMetrics) {
+                case Metrics(metrics) => complete(metrics)
+                case _ => complete(NotFound)
+              }
+            }
+          }
+        } ~
+        pathPrefix("request") {
+          get {
+            pathEnd {
+              onSuccess(ref ? GetRequestMetrics) {
+                case RequestMetrics(metrics) => complete(metrics)
+                case _ => complete(NotFound)
+              }
             }
           }
         }
@@ -85,16 +100,19 @@ final class HyperionManagementService extends ServiceActor {
 
   val logMax = 1000 // TODO configure log-max-entries
   val metricMax = 9600 // TODO configure metric-max-entries
+  val requestMax = 1000 // TODO configure request-metric-max-entries
 
   val hyPath: ActorPath = context.system / "hyperion"
   val hyActor: ActorSelection = context.actorSelection(hyPath)
 
   var logs: mutable.Queue[LogEvent] = mutable.Queue.empty[LogEvent]
   val metrics: mutable.Queue[MetricEvent] = mutable.Queue.empty[MetricEvent]
+  val requests: mutable.Queue[HttpMetricEvent] = mutable.Queue.empty[HttpMetricEvent]
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[LogEvent])
     context.system.eventStream.subscribe(self, classOf[MetricEvent])
+    context.system.eventStream.subscribe(self, classOf[HttpMetricEvent])
   }
 
   override def postStop(): Unit = {
@@ -115,8 +133,13 @@ final class HyperionManagementService extends ServiceActor {
       val repl = sender()
       repl ! Metrics(metrics.toVector.reverse)
 
+    case GetRequestMetrics =>
+      val repl = sender()
+      repl ! RequestMetrics(requests.toVector.reverse)
+
     case e: LogEvent => logs.enqueueFinite(e, logMax)
     case e: MetricEvent => metrics.enqueueFinite(e, metricMax)
+    case e: HttpMetricEvent => requests.enqueueFinite(e, requestMax)
   }
 
 }
