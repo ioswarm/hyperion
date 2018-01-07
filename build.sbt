@@ -1,8 +1,8 @@
 lazy val settings = Seq(
 	name := "hyperion"
 	, organization := "de.ioswarm"
-	, version := "0.2.0"
-	, scalaVersion := "2.12.3"
+	, version := "0.2.1"
+	, scalaVersion := "2.12.4"
 	, scalacOptions ++= Seq(
 		"-language:_"
 		, "-unchecked"
@@ -19,6 +19,7 @@ lazy val hyperion = project.in(file("."))
 	)
 	.aggregate(
 		core
+    , cassandra
 		, auth
 	)
 
@@ -35,7 +36,7 @@ lazy val core = project.in(file("core"))
       , lib.akkaHttp
       , lib.akkaClusterSharding
       , lib.akkaPersistence
-			, lib.akkaPersistenceCassandra
+			, lib.akkaPersistenceQuery
 
       , lib.argonaut
       , lib.akkaHttpArgonaut
@@ -49,6 +50,19 @@ lazy val core = project.in(file("core"))
 		spray.boilerplate.BoilerplatePlugin
   )
 
+lazy val cassandra = project.in(file("cassandra"))
+  .settings(settings)
+  .settings(
+    name := "hyperion-cassandra"
+    , libraryDependencies ++= Seq(
+      lib.akkaPersistenceCassandra
+      , lib.cassie
+    )
+  )
+  .dependsOn(
+    core
+  )
+
 lazy val auth = project.in(file("auth"))
   .settings(settings)
   .settings(
@@ -60,9 +74,9 @@ lazy val auth = project.in(file("auth"))
 
 lazy val lib = new {
 	object Version {
-		val akka = "2.5.4"
-		val akkaHttp = "10.0.10"
-		val akkaPersistenceCassandra = "0.80-RC2"
+		val akka = "2.5.8"
+		val akkaHttp = "10.0.11"
+		val akkaPersistenceCassandra = "0.59"
 
 		val argonaut = "6.2"
     val akkaHttpArgonaut = "1.15.0"
@@ -70,6 +84,8 @@ lazy val lib = new {
 		val sigarLoader = "1.6.6-rev002"
 
     val chill = "0.9.2"
+
+		val cassie = "0.3.1"
 	}
 
 	val akkaActor = "com.typesafe.akka" %% "akka-actor" % Version.akka
@@ -80,6 +96,8 @@ lazy val lib = new {
 	val akkaClusterTools = "com.typesafe.akka" %% "akka-cluster-tools" % Version.akka
 	val akkaClusterSharding = "com.typesafe.akka" %% "akka-cluster-sharding" % Version.akka
 	val akkaPersistence = "com.typesafe.akka" %% "akka-persistence" % Version.akka
+	val akkaPersistenceQuery = "com.typesafe.akka" %% "akka-persistence-query" % Version.akka
+
 	val akkaPersistenceCassandra = "com.typesafe.akka" %% "akka-persistence-cassandra" % Version.akkaPersistenceCassandra
 
   val argonaut = "io.argonaut" %% "argonaut" % Version.argonaut
@@ -88,5 +106,7 @@ lazy val lib = new {
 	val sigarLoader = "io.kamon" % "sigar-loader" % Version.sigarLoader
 
   val chill = "com.twitter" %% "chill-akka" % Version.chill
+
+  val cassie = "de.ioswarm" %% "cassie" % Version.cassie
 }
 
