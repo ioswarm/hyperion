@@ -6,6 +6,7 @@ import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
+import com.typesafe.config.Config
 import de.ioswarm.hyperion.Service.{CommandReceive, EventReceive}
 import de.ioswarm.hyperion.model.{Action, Command, Event}
 
@@ -39,6 +40,8 @@ trait Service {
 
   def name: String
   def props: Props
+
+  def config: Config = Hyperion.config
 
   def initialize: Boolean = true
 

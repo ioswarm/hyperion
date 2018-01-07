@@ -3,6 +3,7 @@ package de.ioswarm.hyperion.management
 import akka.actor.{ActorPath, ActorSelection, Props}
 import akka.pattern.ask
 import akka.util.Timeout
+import com.typesafe.config.Config
 
 import scala.concurrent.duration._
 import de.ioswarm.hyperion.{ManagerService, ServiceActor}
@@ -23,13 +24,21 @@ object HyperionManager {
 }
 class HyperionManager() extends ManagerService {
 
+  override def config: Config = super.config.getConfig("management.hyperion-manager")
+
+  def responseTimeout: FiniteDuration = Some(Duration(config.getString("response-timeout"))).collect {
+    case f: FiniteDuration => f
+  }.getOrElse(10.seconds)
+
+
+
   override def route: ServiceRoute = { ref =>
     import HyperionManager._
     import akka.http.scaladsl.model.StatusCodes._
     import akka.http.scaladsl.server.Directives._
     import de.heikoseeberger.akkahttpargonaut.ArgonautSupport._
 
-    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure response-timeout
+    implicit val timeout: Timeout = Timeout(responseTimeout)
 
     pathPrefix("api" / "v1") {
       pathPrefix("shutdown") {
@@ -98,9 +107,11 @@ final class HyperionManagementService extends ServiceActor {
   import HyperionManager._
   import de.ioswarm.hyperion.util.FiniteQueue._
 
-  val logMax = 1000 // TODO configure log-max-entries
-  val metricMax = 9600 // TODO configure metric-max-entries
-  val requestMax = 1000 // TODO configure request-metric-max-entries
+  override def config: Config = super.config.getConfig("hyperion.management.hyperion-manager")
+
+  val logMax: Int = config.getInt("max-logs")
+  val metricMax: Int = config.getInt("max-metrics")
+  val requestMax: Int = config.getInt("max-request-metrics")
 
   val hyPath: ActorPath = context.system / "hyperion"
   val hyActor: ActorSelection = context.actorSelection(hyPath)

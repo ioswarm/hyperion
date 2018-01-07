@@ -2,14 +2,18 @@ package de.ioswarm.hyperion
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
+import akka.event.LoggingAdapter
 import akka.util.Timeout
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.Future
 
 object Hyperion {
   def apply(implicit system: ActorSystem): Hyperion = new HyperionImpl(system)
   def apply(name: String): Hyperion = new HyperionImpl(ActorSystem(name))
+
+  private lazy val _config: Config = ConfigFactory.load().getConfig("hyperion")
+  def config: Config = _config
 
   case object Initialize
   final case class Initialized(ref: ActorRef)
@@ -31,6 +35,7 @@ trait Hyperion {
   def system: ActorSystem
 
   def config: Config = system.settings.config.getConfig("hyperion")
+  def log: LoggingAdapter = system.log
 
   def run(service: Service): Future[ActorRef]
   def start(services: Service*): Future[ActorRef]
@@ -58,7 +63,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
   private def hyperionService(services: Service*) = ActorServiceImpl(name = "hyperion", children = System(config) +: Management(config) +: services)
 
   override def run(service: Service): Future[ActorRef] = {
-    implicit val timeout: Timeout = Timeout(60.seconds)  // TODO configure service-startup-timeout
+    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure service-startup-timeout
 
     hyperionActor match {
       case Some(ref) => for {
@@ -72,7 +77,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
 
   override def start(services: Service*): Future[ActorRef] = hyperionActor match {
     case Some(ref) =>
-      // TODO print warning to Log
+      log.warning("Hyperion already started.")
       Future.successful(ref)
     case None =>
       hyperionActor = Some(system.actorOf(Props(classOf[HyperionActor], hyperionService(services :_*)), "hyperion"))
