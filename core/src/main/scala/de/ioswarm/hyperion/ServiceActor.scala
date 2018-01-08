@@ -238,6 +238,6 @@ class PipeServiceActor[Mat](service: PipeService[Mat]) extends ServiceActor {
 // --- STREAMING ---
 class StreamServiceActor[Mat](service: StreamingService[Mat]) extends PipeServiceActor[Mat](service) {
 
-
+  
 
 }
