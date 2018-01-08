@@ -3,6 +3,7 @@ package de.ioswarm.hyperion
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.event.LoggingAdapter
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 

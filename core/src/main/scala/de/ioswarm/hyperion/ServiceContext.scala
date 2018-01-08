@@ -10,6 +10,8 @@ class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
   implicit def context: ActorContext = actorContext
   implicit def log: LoggingAdapter = actorLogger
 
+  implicit lazy val materializer: ActorMaterializer = ActorMaterializer()
+
   def config: Config = context.system.settings.config
 
   def actorOf(service: Service): ActorRef = {
@@ -22,10 +24,7 @@ class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
 
   def sender(): ActorRef = context.sender()
 
-}
-
-class MaterializedServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) extends ServiceContext(actorContext, actorLogger) {
-
-  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  def self(): ActorRef = context.self
 
 }
+

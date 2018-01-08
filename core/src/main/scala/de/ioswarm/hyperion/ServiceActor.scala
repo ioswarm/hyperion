@@ -6,6 +6,8 @@ import akka.persistence.{PersistentActor, SnapshotOffer}
 import com.typesafe.config.Config
 import de.ioswarm.hyperion.model.{Command, Event}
 
+import scala.concurrent.Future
+
 trait ServiceActor extends Actor with ActorLogging {
 
   import de.ioswarm.hyperion.Hyperion._
@@ -219,5 +221,23 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
       if (!service.sharded) repl ! Stopped(self)
 
   }
+
+}
+
+class PipeServiceActor[Mat](service: PipeService[Mat]) extends ServiceActor {
+
+  import akka.pattern.pipe
+  import context.dispatcher
+
+  val futMat: Future[Mat] = service.pipe(serviceContext) pipeTo self
+
+  override def serviceReceive: Receive = service.receive(serviceContext)
+
+}
+
+// --- STREAMING ---
+class StreamServiceActor[Mat](service: StreamingService[Mat]) extends PipeServiceActor[Mat](service) {
+
+
 
 }

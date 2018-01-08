@@ -7,14 +7,19 @@ import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerS
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
 import com.typesafe.config.Config
-import de.ioswarm.hyperion.Service.{CommandReceive, EventReceive}
+import de.ioswarm.hyperion.Hyperion.Stop
+import de.ioswarm.hyperion.Service.{CommandReceive, EventReceive, Pipe, ServiceReceive}
 import de.ioswarm.hyperion.model.{Action, Command, Event}
 
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
 object Service {
   type ServiceReceive = ServiceContext => Actor.Receive
   type ServiceRoute = ActorRef => Route
+
+  type Pipe[Mat] = ServiceContext => Future[Mat]
+  type Stream[Mat] = Pipe[Mat]
 
   type CommandReceive[T] = Option[T] => PartialFunction[Command, Action[Event]]
   type EventReceive[T] = Option[T] => PartialFunction[Event, T]
@@ -28,6 +33,12 @@ object Service {
 
   object emptyBehavior extends ServiceReceive {
     override def apply(ctx: ServiceContext): Actor.Receive = Actor.emptyBehavior
+  }
+
+  object emptyPipeBehavior extends ServiceReceive {
+    override def apply(ctx: ServiceContext): Actor.Receive = {
+      case a: Any =>
+    }
   }
 
   object emptyRoute extends ServiceRoute {
@@ -313,5 +324,100 @@ case class PersistentServiceImpl[T](
     if (dispatcher.isDefined) p.withDispatcher(dispatcher.get)
     else p
   }
+
+}
+
+trait PipeService[Mat] extends Service {
+
+  def pipe: Service.Pipe[Mat]
+
+  def receive: Service.ServiceReceive
+  def dispatcher: Option[String]
+  def router: Option[RouterConfig]
+
+  def actorClass: Class[_ <: PipeServiceActor[Mat]]
+  def actorArgs: Seq[Any]
+
+  def hasReceive: Boolean = receive != Service.emptyPipeBehavior
+
+  def withPipe[T >: PipeService[Mat]](pipe: Service.Pipe[Mat]): T
+
+  def withReceive[T >: PipeService[Mat]](receive: Service.ServiceReceive): T
+  def withDispatcher[T >: PipeService[Mat]](d: String): T
+  def withRouter[T >: PipeService[Mat]](r: RouterConfig): T
+
+  def withActor[T >: PipeService[Mat]](clazz: Class[_ <: PipeServiceActor[Mat]]): T
+  def withArgs[T >: PipeService[Mat]](args: Any*): T
+
+}
+case class PipeServiceImpl[Mat](
+                                name: String
+                                , pipe: Service.Pipe[Mat]
+                                , receive: Service.ServiceReceive = Service.emptyPipeBehavior
+                                , dispatcher: Option[String] = None
+                                , router: Option[RouterConfig] = None
+                                , actorClass: Class[_ <: PipeServiceActor[Mat]] = classOf[PipeServiceActor[Mat]]
+                                , actorArgs: Seq[Any] = Seq.empty[Any]
+                                ) extends PipeService[Mat] {
+
+  override def props: Props = {
+    var p = Props(actorClass, this +: actorArgs :_*)
+    if (dispatcher.isDefined) p = p.withDispatcher(dispatcher.get)
+    if (router.isDefined) p = p.withRouter(router.get)
+    p.copy()
+  }
+
+  override def withPipe[T >: PipeService[Mat]](p: Service.Pipe[Mat]): T = copy(pipe = p)
+
+  override def withReceive[T >: PipeService[Mat]](r: ServiceReceive): T = copy(receive = r)
+
+  override def withDispatcher[T >: PipeService[Mat]](d: String): T = copy(dispatcher = Some(d))
+
+  override def withRouter[T >: PipeService[Mat]](r: RouterConfig): T = copy(router = Some(r))
+
+  override def withActor[T >: PipeService[Mat]](clazz: Class[_ <: PipeServiceActor[Mat]]): T = copy(actorClass = clazz)
+
+  override def withArgs[T >: PipeService[Mat]](args: Any*): T = copy(actorArgs = args)
+
+}
+
+trait StreamingService[Mat] extends PipeService[Mat] {
+
+  def stream: Service.Stream[Mat]
+
+  def withStream[T >: StreamingService[Mat]](p: Service.Stream[Mat]): T
+
+  override def pipe: Pipe[Mat] = stream
+  override def withPipe[T >: StreamingService[Mat]](p: Service.Pipe[Mat]): T = withStream(p)
+
+}
+case class StreamingServiceImpl[Mat](
+                                 name: String
+                                 , stream: Service.Stream[Mat]
+                                 , receive: Service.ServiceReceive = Service.emptyPipeBehavior
+                                 , dispatcher: Option[String] = None
+                                 , router: Option[RouterConfig] = None
+                                 , actorClass: Class[_ <: PipeServiceActor[Mat]] = classOf[StreamServiceActor[Mat]]
+                                 , actorArgs: Seq[Any] = Seq.empty[Any]
+                               ) extends StreamingService[Mat] {
+
+  override def props: Props = {
+    var p = Props(actorClass, this +: actorArgs :_*)
+    if (dispatcher.isDefined) p = p.withDispatcher(dispatcher.get)
+    if (router.isDefined) p = p.withRouter(router.get)
+    p.copy()
+  }
+
+  override def withStream[T >: StreamingService[Mat]](p: Service.Stream[Mat]): T = copy(stream = p)
+
+  override def withReceive[T >: StreamingService[Mat]](r: ServiceReceive): T = copy(receive = r)
+
+  override def withDispatcher[T >: StreamingService[Mat]](d: String): T = copy(dispatcher = Some(d))
+
+  override def withRouter[T >: StreamingService[Mat]](r: RouterConfig): T = copy(router = Some(r))
+
+  override def withActor[T >: StreamingService[Mat]](clazz: Class[_ <: PipeServiceActor[Mat]]): T = copy(actorClass = clazz)
+
+  override def withArgs[T >: StreamingService[Mat]](args: Any*): T = copy(actorArgs = args)
 
 }

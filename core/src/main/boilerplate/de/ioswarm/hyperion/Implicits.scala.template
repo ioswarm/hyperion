@@ -68,6 +68,8 @@ object Implicits {
       def persist[T]: PersistentService[T] = persist[T](None)
       def persist[T](t: Option[T]): PersistentService[T] = PersistentServiceImpl[T](name = s, value = t)
 
+      def stream[T](f: Stream[T]): StreamingService[T] = StreamingServiceImpl(s, stream = f)
+
       def service(f: Service.ServiceReceive): Service =  Implicits.service(s)(f)
 
       [#def service([#s1: Service#])(f: ServiceContext => ([#ActorRef#]) => Actor.Receive): Service = Implicits.service(s, [#s1#])(f)#
