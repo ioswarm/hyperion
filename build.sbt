@@ -8,7 +8,6 @@ lazy val settings = Seq(
 		, "-unchecked"
 		, "-deprecation"
 		, "-encoding", "UTF-8"
-		, "target:jvm-1.8"
 	)
 )
 
