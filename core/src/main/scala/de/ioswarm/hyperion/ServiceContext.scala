@@ -5,10 +5,14 @@ import akka.event.LoggingAdapter
 import akka.stream.ActorMaterializer
 import com.typesafe.config.Config
 
+import scala.concurrent.ExecutionContextExecutor
+
 class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
 
   implicit def context: ActorContext = actorContext
   implicit def log: LoggingAdapter = actorLogger
+
+  implicit def dispatcher: ExecutionContextExecutor = actorContext.dispatcher
 
   implicit lazy val materializer: ActorMaterializer = ActorMaterializer()
 
