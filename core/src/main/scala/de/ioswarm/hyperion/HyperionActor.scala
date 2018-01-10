@@ -1,7 +1,7 @@
 package de.ioswarm.hyperion
 
 import akka.Done
-import akka.actor.{ActorRef, Terminated}
+import akka.actor.{ActorPath, ActorRef, Terminated}
 import akka.http.scaladsl.server.Route
 import com.typesafe.config.Config
 
@@ -18,14 +18,32 @@ private[hyperion] class HyperionActor(service: ActorService) extends ActorServic
 
   val watchedActors: mutable.ArrayBuffer[ActorRef] = mutable.ArrayBuffer.empty[ActorRef]
 
-  def httpServiceMap: mutable.Map[ActorRef, HttpService] = childServiceMap.filter(t => t._2.isInstanceOf[HttpService] && t._2.asInstanceOf[HttpService].hasRoute).map(e => (e._1, e._2.asInstanceOf[HttpService]))
+  def children(s: Service): Seq[Service] = s match {
+    case as: ActorService => as.children
+    case _ => Seq.empty[Service]
+  }
+  def flat(s: Service, path: String): Seq[(Service, ActorPath)] = (s, ActorPath.fromString(path+"/"+s.name)) +: children(s).flatMap(sx => flat(sx, path+"/"+s.name))
+
+//  val serviceIndex: Map[Service, ActorPath] = flat(service, self.path.address+"/user").drop(1).toMap
+
+  lazy val httpServiceList: Seq[Future[(HttpService, ActorRef)]] = flat(service, self.path.address + "/user").drop(1).filter(t => t._1.isInstanceOf[HttpService]).map(t => context.system.actorSelection(t._2).resolveOne(200.millis).map(ref => (t._1.asInstanceOf[HttpService], ref)))
+  def serviceRoute: Future[Route] = {
+    Future.sequence(httpServiceList).map { services =>
+      import akka.http.scaladsl.server.Directives._
+
+      val first: Route = services.head._1.route(services.head._2)
+      services.drop(1).aggregate(first)({ (route, srv) => route ~ srv._1.route(srv._2) }, { (r1, r2) => r1 ~ r2 })
+    }
+  }
+
+  /*def httpServiceMap: mutable.Map[ActorRef, HttpService] = childServiceMap.filter(t => t._2.isInstanceOf[HttpService] && t._2.asInstanceOf[HttpService].hasRoute).map(e => (e._1, e._2.asInstanceOf[HttpService]))
   def serviceRoute: Route = {
     import akka.http.scaladsl.server.Directives._
 
     val services = httpServiceMap.toList
     val first: Route = services.head._2.route(services.head._1)
     services.drop(1).aggregate(first)({(route,srv) => route ~ srv._2.route(srv._1)}, {(r1, r2) => r1 ~ r2})
-  }
+  }*/
 
   override def config: Config = super.config.getConfig("hyperion")
 
@@ -38,10 +56,10 @@ private[hyperion] class HyperionActor(service: ActorService) extends ActorServic
       Future sequence service.children.map(c => startChildService(c)) onComplete {
         case Success(_) =>
           // start Route-Service
-          if (httpServiceMap.nonEmpty) {
+          if (httpServiceList.nonEmpty) {
             val host = config.getString("http.hostname")
             val port = config.getInt("http.port")
-            startChildService(RouteService(host, port, serviceRoute)) onComplete {
+            serviceRoute.flatMap(route => startChildService(RouteService(host, port, route))) onComplete {
               case Success(_) =>
                 log.debug("Hyperion initialized.")
                 repl ! Initialized(self)

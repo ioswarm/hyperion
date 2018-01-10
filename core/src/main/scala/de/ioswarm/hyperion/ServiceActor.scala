@@ -83,7 +83,8 @@ class ActorServiceActor(service: ActorService) extends ServiceActor {
 
   def startChildService(service: Service): Future[ServiceStarted] = {
     //val ref = context.actorOf(service.props, service.name)
-    val ref = service.createActor
+//    val ref = service.createActor
+    val ref = serviceContext.actorOf(service)
     log.debug("Start child-service {} at {}", service.name, ref.path)
     if (service.initialize) {
       implicit val timeout: Timeout = Timeout(10.seconds) // TODO configure service-start-timeout
