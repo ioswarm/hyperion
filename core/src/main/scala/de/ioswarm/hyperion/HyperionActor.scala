@@ -20,6 +20,9 @@ private[hyperion] class HyperionActor(service: ActorService) extends ActorServic
 
   def children(s: Service): Seq[Service] = s match {
     case as: ActorService => as.children
+    case ht: HttpService => ht.service match {
+      case as: ActorService => as.children
+    }
     case _ => Seq.empty[Service]
   }
   def flat(s: Service, path: String): Seq[(Service, ActorPath)] = (s, ActorPath.fromString(path+"/"+s.name)) +: children(s).flatMap(sx => flat(sx, path+"/"+s.name))

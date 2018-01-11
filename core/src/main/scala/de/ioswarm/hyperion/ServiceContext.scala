@@ -28,7 +28,8 @@ class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
 
   def sender(): ActorRef = context.sender()
 
-  def self(): ActorRef = context.self
+  //def self(): ActorRef = context.self
+  implicit final val self: ActorRef = context.self
 
 }
 

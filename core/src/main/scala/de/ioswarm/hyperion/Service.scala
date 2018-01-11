@@ -37,7 +37,7 @@ object Service {
 
   object emptyPipeBehavior extends ServiceReceive {
     override def apply(ctx: ServiceContext): Actor.Receive = {
-      case _ => ctx.self() ! Stop
+      case _ => ctx.self ! Stop
     }
   }
 
