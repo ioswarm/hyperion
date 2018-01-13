@@ -9,7 +9,6 @@ import akka.http.scaladsl.server.Route
 import akka.stream.{ActorMaterializer, FlowShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Sink, Unzip, Zip}
 import akka.util.Timeout
-import de.ioswarm.hyperion.Hyperion.Stopped
 import de.ioswarm.hyperion.model.HttpMetricEvent
 
 import scala.concurrent.Future
@@ -35,7 +34,7 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
 
   implicit val mat: ActorMaterializer = ActorMaterializer()
 
-  def handleRequest[Mat](remote: InetSocketAddress, millis: Long, handler: Flow[HttpRequest, HttpResponse, Mat]): Flow[HttpRequest, HttpResponse, Mat] = Flow.fromGraph(GraphDSL.create(handler){ implicit b => hdl =>
+  def handleRequest[Mat](remote: InetSocketAddress, handler: Flow[HttpRequest, HttpResponse, Mat]): Flow[HttpRequest, HttpResponse, Mat] = Flow.fromGraph(GraphDSL.create(handler){ implicit b => hdl =>
     import GraphDSL.Implicits._
 
     val req = b.add(Flow[HttpRequest].map{req =>
@@ -48,7 +47,7 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
         ))
       else req
     }
-      .map(req => (req, (millis, req)))
+      .map(req => (req, (java.lang.System.currentTimeMillis(), req)))
     )
 
     val uz = b.add(Unzip[HttpRequest, (Long, HttpRequest)])
@@ -71,7 +70,7 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
   val binding: Future[Http.ServerBinding] = Http(context.system).bind(interface = host, port = port).to(sink = Sink foreach { conn =>
     val remote = conn.remoteAddress
 
-    conn.handleWith(handleRequest(remote, java.lang.System.currentTimeMillis(), Route.handlerFlow(route)))
+    conn.handleWith(handleRequest(remote, Route.handlerFlow(route)))
   })
     .run() pipeTo self
 
