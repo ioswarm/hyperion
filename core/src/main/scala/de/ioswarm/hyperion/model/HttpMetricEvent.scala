@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 
 object HttpMetricEvent {
 
-  def apply(requestMillis: Long, request: HttpRequest, responseMillis: Option[Long] = None, response: Option[HttpResponse] = None, systemName: Option[String] = None, address: Option[String] = None): HttpMetricEvent = HttpMetricEvent(
+  def create(requestMillis: Long, request: HttpRequest, responseMillis: Option[Long] = None, response: Option[HttpResponse] = None, systemName: Option[String] = None, address: Option[String] = None): HttpMetricEvent = HttpMetricEvent(
     Instant.ofEpochMilli(requestMillis)
     , request
     , responseMillis.map(m => Instant.ofEpochMilli(m))

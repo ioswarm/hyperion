@@ -6,7 +6,7 @@ import java.time.Instant
 
 object LogEvent {
 
-  def apply(e: LogEntry, systemName: Option[String], address: Option[String]): LogEvent = LogEvent(
+  def create(e: LogEntry, systemName: Option[String], address: Option[String]): LogEvent = LogEvent(
     e.logType
     , e.timestamp
     , e.source

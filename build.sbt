@@ -56,6 +56,7 @@ lazy val cassandra = project.in(file("cassandra"))
     , libraryDependencies ++= Seq(
       lib.akkaPersistenceCassandra
       , lib.cassie
+      , lib.cassieAkkaStream
     )
   )
   .dependsOn(
@@ -107,5 +108,6 @@ lazy val lib = new {
   val chill = "com.twitter" %% "chill-akka" % Version.chill
 
   val cassie = "de.ioswarm" %% "cassie" % Version.cassie
+	val cassieAkkaStream = "de.ioswarm" %% "cassie-akka-stream" % Version.cassie
 }
 

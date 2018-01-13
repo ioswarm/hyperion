@@ -55,7 +55,7 @@ class RouteService(service: ActorService, host: String, port: Int, route: Route)
     val bc = b.add(Broadcast[HttpResponse](2))
     val zip = b.add(Zip[(Long, HttpRequest), HttpResponse])
     val metric = b.add(Flow[((Long, HttpRequest), HttpResponse)].map{ m =>
-      HttpMetricEvent(m._1._1, m._1._2, Some(java.lang.System.currentTimeMillis()), Some(m._2))
+      HttpMetricEvent.create(m._1._1, m._1._2, Some(java.lang.System.currentTimeMillis()), Some(m._2))
     })
 
 

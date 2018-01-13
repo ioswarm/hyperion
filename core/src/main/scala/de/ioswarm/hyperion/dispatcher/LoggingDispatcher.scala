@@ -30,7 +30,7 @@ class LoggingDispatcherService extends ServiceActor {
 
   override def serviceReceive: Receive = {
     case e: LogEntry =>
-      events.publish(LogEvent(e, Some(systemName), Some(address.toString)))
+      events.publish(LogEvent.create(e, Some(systemName), Some(address.toString)))
   }
 
 }
