@@ -178,8 +178,8 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   def receiveEvent(value: Option[T], evt: Event): Option[T] = {
     val x = service.eventReceive(value)(evt)
-    log.debug("Receive-Event {} - old-value: {} - new-value: {}", evt, value, x)
-    Some(x)
+    log.debug("Receive-Event {} for ID {} - old-value: {} - new-value: {}", evt, persistenceId, value, x)
+    x
   }
 
   override def persistenceId: String = self.path.name
