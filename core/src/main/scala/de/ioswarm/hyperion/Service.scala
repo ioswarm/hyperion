@@ -195,6 +195,8 @@ case class HttpServiceImpl(service: Service, route: Service.ServiceRoute = Servi
 
   override def props: Props = service.props
 
+  override def createActor(implicit ac: ActorContext): ActorRef = service.createActor
+
   def withRoute[T >: HttpService](r: ServiceRoute): T = copy(route = r)
 }
 
