@@ -72,6 +72,8 @@ object Implicits {
 
       def service(f: Service.ServiceReceive): Service =  Implicits.service(s)(f)
 
+      def singletonProxy(path: String): Service = SingletonProxyServiceImpl(s, path)
+
       [#def service([#s1: Service#])(f: ServiceContext => ([#ActorRef#]) => Actor.Receive): Service = Implicits.service(s, [#s1#])(f)#
       ]
 

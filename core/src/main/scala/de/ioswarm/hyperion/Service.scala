@@ -1,9 +1,9 @@
 package de.ioswarm.hyperion
 
-import akka.actor.{Actor, ActorContext, ActorRef, Props}
+import akka.actor.{Actor, ActorContext, ActorPath, ActorRef, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
-import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
 import com.typesafe.config.Config
@@ -165,7 +165,6 @@ trait ManagerService extends Service {
 
 }
 
-// TODO implement singleton-proxy-service
 case class SingletonServiceImpl[T <:Service](service: T) extends Service {
   import Hyperion._
 
@@ -173,11 +172,32 @@ case class SingletonServiceImpl[T <:Service](service: T) extends Service {
 
   override def props: Props = service.props
 
-  override def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(ClusterSingletonManager.props(
-    singletonProps = props
-    , terminationMessage = Stop
-    , settings = ClusterSingletonManagerSettings(ac.system)
-  ), name)
+  override def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(Props(classOf[PropsForwardServiceActor]
+    , ClusterSingletonManager.props(
+      singletonProps = props
+      , terminationMessage = Stop
+      , settings = ClusterSingletonManagerSettings(ac.system)
+    ))
+    , name)
+
+}
+
+case class SingletonProxyServiceImpl(name: String, path: String) extends Service {
+
+  override def props: Props = throw new IllegalAccessException("No Props needed for SingletonProxies.")
+
+  def proxyPath: String = {
+    val ap = ActorPath.fromString(path)
+    (ap / ap.name).toStringWithoutAddress
+  }
+
+  override def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(
+    ClusterSingletonProxy.props(
+      proxyPath
+      , ClusterSingletonProxySettings(ac.system)
+    )
+    , name
+  )
 
 }
 

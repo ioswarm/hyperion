@@ -43,7 +43,7 @@ trait ServiceActor extends Actor with ActorLogging {
 
 private[hyperion] class PropsForwardServiceActor(props: Props) extends ServiceActor {
 
-  val ref: ActorRef = context.actorOf(props)
+  val ref: ActorRef = context.actorOf(props, self.path.name)
 
   override def registerSelf(): Unit = {
     register(self)
