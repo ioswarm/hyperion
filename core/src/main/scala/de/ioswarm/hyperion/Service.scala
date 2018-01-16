@@ -3,7 +3,7 @@ package de.ioswarm.hyperion
 import akka.actor.{Actor, ActorContext, ActorRef, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
-import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import akka.http.scaladsl.server.Route
 import akka.routing.RouterConfig
 import com.typesafe.config.Config
@@ -207,7 +207,6 @@ trait ManagerService extends Service {
 
 }
 
-// TODO implement singleton-proxy-service
 case class SingletonServiceImpl[T <:Service](service: T) extends Service {
   import Hyperion._
 
@@ -220,6 +219,20 @@ case class SingletonServiceImpl[T <:Service](service: T) extends Service {
     , terminationMessage = Stop
     , settings = ClusterSingletonManagerSettings(ac.system)
   ), name)
+
+}
+
+case class SingletonProxyServiceImpl(name: String, path: String) extends Service {
+
+  override def props: Props = throw new IllegalAccessException("No Props needed for SingletonProxies.")
+
+  override def createActor(implicit ac: ActorContext): ActorRef = ac.actorOf(
+    ClusterSingletonProxy.props(
+      path
+      , ClusterSingletonProxySettings(ac.system)
+    )
+    , name
+  )
 
 }
 
