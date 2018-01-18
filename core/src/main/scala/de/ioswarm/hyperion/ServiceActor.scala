@@ -188,7 +188,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
     case evt: Event =>
       value = receiveEvent(value, evt)
     case SnapshotOffer(_, snapshot: Any) =>
-      log.debug("Recover snapshot for {}: {}", persistenceId, snapshot)
+      log.debug("Recover snapshot: {}", snapshot)
       value = Some(snapshot.asInstanceOf[T])
   }
 
@@ -201,30 +201,24 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
           value = receiveEvent(value, evt.payload.asInstanceOf[Event])
           if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
             saveSnapshot(value.get)
-          if (action.isReplyable) {
-            log.debug("{} reply event {} to sender {}.",persistenceId, evt.payload, sender())
-            sender() ! evt.payload.asInstanceOf[Event]
-          }
+          if (action.isReplyable) sender() ! evt.payload.asInstanceOf[Event]
         }
-      } else if (action.isReplyable) {
-        log.debug("{} reply {} to sender {}.",persistenceId, action.value, sender())
-        sender() ! action.value
-      }
+      } else if (action.isReplyable) sender() ! action.value
     case ReceiveTimeout =>
       log.debug("Receive timeout ... passivate persistenceId: "+persistenceId)
       if (service.sharded) context.parent ! Passivate(stopMessage = Stop)
       else self ! Stop
     case Initialize =>
-      log.debug("Initialize persistent-service {} at {}", persistenceId, self.path)
+      log.debug("Initialize persistent-service {} at {}", self.path.name, self.path)
       val repl = sender()
-      log.debug("Persistent-service {} at {} initialized.", persistenceId, self.path)
+      log.debug("Persistent-service {} at {} initialized.", self.path.name, self.path)
       registerSelf()
       repl ! Initialized(self)
     case Stop =>
-      log.debug("Persistent-service {} at {} shutting down...", persistenceId, self.path)
+      log.debug("Persistent-service {} at {} shutting down...", self.path.name, self.path)
       val repl = sender()
       context.stop(self)
-      log.debug("Persistent-service {} at {} is down.", persistenceId, self.path)
+      log.debug("Persistent-service {} at {} is down.", self.path.name, self.path)
       if (!service.sharded) repl ! Stopped(self)
 
   }

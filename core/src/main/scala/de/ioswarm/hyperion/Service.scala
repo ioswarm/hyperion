@@ -22,7 +22,7 @@ object Service {
   type Stream[Mat] = Pipe[Mat]
 
   type CommandReceive[T] = Option[T] => PartialFunction[Command, Action[Event]]
-  type EventReceive[T] = Option[T] => PartialFunction[Event, T]
+  type EventReceive[T] = Option[T] => PartialFunction[Event, Option[T]]
 
   val defaultExtractEntityId: ShardRegion.ExtractEntityId = {
     case cmd: Command => (cmd.id, cmd)
@@ -134,48 +134,6 @@ case class ActorServiceImpl(
 
 }
 
-/*trait HttpService extends ActorService {
-  type ServiceRoute = Service.ServiceRoute
-
-  def route: ServiceRoute
-
-  def hasRoute: Boolean = route != Service.emptyRoute
-
-  def withRoute[T >: HttpService](route: ServiceRoute): T
-}
-
-case class HttpServiceImpl(
-                            name: String
-                            , receive: Service.ServiceReceive = Service.emptyBehavior
-                            , route: Service.ServiceRoute = Service.emptyRoute
-                            , dispatcher: Option[String] = None
-                            , router: Option[RouterConfig] = None
-                            , actorClass: Class[_ <: ActorServiceActor] = classOf[ActorServiceActor]
-                            , actorArgs: Seq[Any] = Seq.empty[Any]
-                            , children: Seq[Service] = Seq.empty[Service]
-                          ) extends HttpService {
-
-  def props: Props = {
-    var p = Props(actorClass, this +: actorArgs :_*)
-    if (dispatcher.isDefined) p = p.withDispatcher(dispatcher.get)
-    if (router.isDefined) p = p.withRouter(router.get)
-    p.copy()
-  }
-
-  def withReceive[T >: HttpService](r: ServiceReceive): T = copy(receive = r)
-  def withDispatcher[T >: HttpService](d: String): T = copy(dispatcher = Some(d))
-  def withRouter[T >: HttpService](r: RouterConfig): T = copy(router = Some(r))
-
-  def withActor[T >: HttpService](clazz: Class[_ <: ActorServiceActor]): T = copy(actorClass = clazz)
-  def withArgs[T >: HttpService](args: Any*): T = copy(actorArgs = args)
-
-  def :=[T >: HttpService](s: Seq[Service]): T = copy(children = s)
-  def +=[T >: HttpService](s: Service): T = copy(children = s +: this.children)
-  def ++=[T >: HttpService](s: Seq[Service]): T = copy(children = this.children ++ s)
-
-  def withRoute[T >: HttpService](r: ServiceRoute): T = copy(route = r)
-
-}*/
 
 trait HttpService extends Service {
   type ServiceRoute = Service.ServiceRoute
@@ -298,7 +256,7 @@ trait PersistentService[T] extends Service {
     commands.aggregate(first(value))( { (p, cmd) => p orElse cmd(value) }, { (p1, p2) => p1 orElse p2 })
   }
 
-  def eventReceive(value: Option[T]): PartialFunction[Event, T] = {
+  def eventReceive(value: Option[T]): PartialFunction[Event, Option[T]] = {
     require(events.nonEmpty)
     val first = events.head
     events.aggregate(first(value))({(p, evt) => p orElse evt(value)}, {(p1, p2) => p1 orElse p2})
