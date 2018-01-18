@@ -8,7 +8,6 @@ object FiniteQueue {
     def enqueueFinite(elem: A, maxSize: Int): Unit = {
       q.enqueue(elem)
       while (q.size > maxSize) {
-        println("dequeue")
         q.dequeue()
       }
     }
