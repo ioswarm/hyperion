@@ -68,8 +68,12 @@ lazy val auth = project.in(file("auth"))
   .settings(
     name := "hyperion-auth"
     , libraryDependencies ++= Seq(
-
+      lib.jbcrypt
     )
+  )
+  .dependsOn(
+    core
+    , cassandra
   )
 
 lazy val lib = new {
@@ -86,6 +90,8 @@ lazy val lib = new {
     val chill = "0.9.2"
 
 		val cassie = "0.3.1"
+
+    val jbcrypt = "0.4"
 	}
 
 	val akkaActor = "com.typesafe.akka" %% "akka-actor" % Version.akka
@@ -109,5 +115,8 @@ lazy val lib = new {
 
   val cassie = "de.ioswarm" %% "cassie" % Version.cassie
 	val cassieAkkaStream = "de.ioswarm" %% "cassie-akka-stream" % Version.cassie
+
+	val jbcrypt = "org.mindrot" % "jbcrypt" % Version.jbcrypt
+
 }
 

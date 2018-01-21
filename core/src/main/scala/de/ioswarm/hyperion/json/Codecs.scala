@@ -26,6 +26,10 @@ object Codecs {
     jString(u.toString())
   )
 
+  implicit def uriDecoder: DecodeJson[Uri] = implicitly[DecodeJson[String]].map(s =>
+    Uri(s)
+  )
+
   implicit def httpHeaderEncoder: EncodeJson[HttpHeader] = EncodeJson(h =>
     ("name" := h.name) ->: ("value" := h.value) ->: jEmptyObject
   )
