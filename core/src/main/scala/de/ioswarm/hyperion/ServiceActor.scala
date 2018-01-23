@@ -5,7 +5,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 import akka.persistence.query.scaladsl.ReadJournal
 import akka.persistence.{PersistentActor, SnapshotOffer}
-import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
+import akka.stream.{ActorMaterializer, KillSwitch, KillSwitches, UniqueKillSwitch}
 import akka.stream.scaladsl.Keep
 import com.typesafe.config.Config
 import de.ioswarm.hyperion.Hyperion.{Stop, Stopped}
@@ -172,10 +172,14 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   import Hyperion._
 
+  implicit lazy val mat: ActorMaterializer = ActorMaterializer()
+
   val snapshotInterval: Int = service.snapshotInterval
   var value: Option[T] = service.value
 
   context.setReceiveTimeout(service.timeout)
+
+  val stream: Option[KillSwitch] = service.queryStream.map(q => q.run(persistenceId, lastSequenceNr, Long.MaxValue))
 
   def canRegister: Boolean = !service.sharded
   def register(ref: ActorRef): Unit = if (canRegister) context.actorSelection(context.system / "hyperion") ! Register(ref)
@@ -222,6 +226,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
     case Stop =>
       log.debug("Persistent-service {} at {} shutting down...", self.path.name, self.path)
       val repl = sender()
+      stream.foreach(_.shutdown())
       context.stop(self)
       log.debug("Persistent-service {} at {} is down.", self.path.name, self.path)
       if (!service.sharded) repl ! Stopped(self)

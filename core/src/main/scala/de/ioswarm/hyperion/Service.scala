@@ -242,7 +242,7 @@ trait PersistentService[T] extends Service {
   def actorClass: Class[_ >: PersistentServiceActor[T]]
   def actorArgs: Seq[Any]
   def sharded: Boolean
-  def queryService: Option[PersistenceQueryService[_]]
+  def queryStream: Option[QueryStream]
 
   def withValue(t: Option[T]): PersistentService[T]
   def withTimeout(d: Duration): PersistentService[T]
@@ -251,7 +251,7 @@ trait PersistentService[T] extends Service {
   def withActor(c: Class[_ >: PersistentServiceActor[T]]): PersistentService[T]
   def withArgs(args: Any*): PersistentService[T]
   def withSharding(b: Boolean): PersistentService[T]
-  def withQueryService[A <: ReadJournal](queryService: PersistenceQueryService[A]): PersistentService[T]
+  def withQueryStream(query: QueryStream): PersistentService[T]
 
   def command(c: CommandReceive[T]): PersistentService[T]
   def event(e: EventReceive[T]): PersistentService[T]
@@ -280,7 +280,7 @@ case class PersistentServiceImpl[T](
                                    , actorClass: Class[_ >: PersistentServiceActor[T]] = classOf[PersistentServiceActor[T]]
                                    , actorArgs: Seq[Any] = Seq.empty[Any]
                                    , sharded: Boolean = false
-                                   , queryService: Option[PersistenceQueryService[_]] = None
+                                   , queryStream: Option[QueryStream] = None
                                    ) extends PersistentService[T] {
 
   require(snapshotInterval >= 0)
@@ -302,6 +302,8 @@ case class PersistentServiceImpl[T](
 
   override def withSharding(b: Boolean): PersistentService[T] = copy(sharded = b)
 
+  override def withQueryStream(query: QueryStream): PersistentService[T] = copy(queryStream = Some(query))
+
   override def command(cmd: CommandReceive[T]): PersistentService[T] = copy(commands = cmd +: this.commands)
 
   override def event(evt: EventReceive[T]): PersistentService[T] = copy(events = evt +: events)
@@ -311,8 +313,6 @@ case class PersistentServiceImpl[T](
     if (dispatcher.isDefined) p.withDispatcher(dispatcher.get)
     else p
   }
-
-  override def withQueryService[A <: ReadJournal](query: PersistenceQueryService[A]): PersistentService[T] = copy(queryService = Some(query))
 
 }
 
