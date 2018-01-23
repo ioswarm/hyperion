@@ -1,11 +1,15 @@
 package de.ioswarm.hyperion
 
-import akka.actor.{Actor, ActorContext, ActorPath, ActorRef, Props}
+import akka.NotUsed
+import akka.actor.{Actor, ActorContext, ActorPath, ActorRef, ActorSystem, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import akka.http.scaladsl.server.Route
+import akka.persistence.query.{EventEnvelope, PersistenceQuery}
+import akka.persistence.query.scaladsl.ReadJournal
 import akka.routing.RouterConfig
+import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
 import de.ioswarm.hyperion.Hyperion.Stop
 import de.ioswarm.hyperion.Service.{CommandReceive, EventReceive, Pipe, ServiceReceive}
@@ -238,6 +242,7 @@ trait PersistentService[T] extends Service {
   def actorClass: Class[_ >: PersistentServiceActor[T]]
   def actorArgs: Seq[Any]
   def sharded: Boolean
+  def queryService: Option[PersistenceQueryService[_]]
 
   def withValue(t: Option[T]): PersistentService[T]
   def withTimeout(d: Duration): PersistentService[T]
@@ -246,6 +251,7 @@ trait PersistentService[T] extends Service {
   def withActor(c: Class[_ >: PersistentServiceActor[T]]): PersistentService[T]
   def withArgs(args: Any*): PersistentService[T]
   def withSharding(b: Boolean): PersistentService[T]
+  def withQueryService[A <: ReadJournal](queryService: PersistenceQueryService[A]): PersistentService[T]
 
   def command(c: CommandReceive[T]): PersistentService[T]
   def event(e: EventReceive[T]): PersistentService[T]
@@ -274,6 +280,7 @@ case class PersistentServiceImpl[T](
                                    , actorClass: Class[_ >: PersistentServiceActor[T]] = classOf[PersistentServiceActor[T]]
                                    , actorArgs: Seq[Any] = Seq.empty[Any]
                                    , sharded: Boolean = false
+                                   , queryService: Option[PersistenceQueryService[_]] = None
                                    ) extends PersistentService[T] {
 
   require(snapshotInterval >= 0)
@@ -304,6 +311,22 @@ case class PersistentServiceImpl[T](
     if (dispatcher.isDefined) p.withDispatcher(dispatcher.get)
     else p
   }
+
+  override def withQueryService[A <: ReadJournal](query: PersistenceQueryService[A]): PersistentService[T] = copy(queryService = Some(query))
+
+}
+
+trait PersistenceQueryService[T <: ReadJournal] extends Service {
+
+  def pluginId: String
+
+  def journalReader(system: ActorSystem): T = PersistenceQuery(system).readJournalFor[T](pluginId)
+
+  def source(system: ActorSystem, fromSequenceNr: Long, toSequenceNr: Long): Source[EventEnvelope, NotUsed]
+
+  def sink: Sink[EventEnvelope, NotUsed]
+
+  override def props: Props = Props(classOf[PersistenceQueryServiceActor[T]], this)
 
 }
 

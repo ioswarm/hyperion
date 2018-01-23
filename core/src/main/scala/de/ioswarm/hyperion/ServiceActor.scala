@@ -1,9 +1,14 @@
 package de.ioswarm.hyperion
 
+import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
+import akka.persistence.query.scaladsl.ReadJournal
 import akka.persistence.{PersistentActor, SnapshotOffer}
+import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
+import akka.stream.scaladsl.Keep
 import com.typesafe.config.Config
+import de.ioswarm.hyperion.Hyperion.{Stop, Stopped}
 import de.ioswarm.hyperion.model.{Command, Event}
 
 import scala.concurrent.Future
@@ -222,6 +227,29 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
       if (!service.sharded) repl ! Stopped(self)
 
   }
+
+}
+
+class PersistenceQueryServiceActor[T <: ReadJournal](service: PersistenceQueryService[T], fromSequenceNr: Long, toSequenceNr: Long) extends ServiceActor {
+
+  implicit val mat: ActorMaterializer = ActorMaterializer()
+
+  val (killSwitch, last) = service.source(context.system, fromSequenceNr, toSequenceNr)
+    .viaMat(KillSwitches.single)(Keep.right)
+    .toMat(service.sink)(Keep.both)
+    .run()
+
+  override def serviceReceive: Receive = {
+    case Stop =>
+      log.debug("Service {} at {} shutting down...", self.path.name, self.path)
+      val repl = sender()
+      killSwitch.shutdown()
+      context.stop(self)
+      log.debug("Service {} at {} is down.", self.path.name, self.path)
+      repl ! Stopped(self)
+  }
+
+  override def receive: Receive = serviceReceive orElse actorReceive
 
 }
 
