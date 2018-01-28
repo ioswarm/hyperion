@@ -43,6 +43,8 @@ lazy val core = project.in(file("core"))
   		, lib.sigarLoader
 
       , lib.chill
+
+      ,lib.apacheCLI
     )
   )
   .enablePlugins(
@@ -92,6 +94,8 @@ lazy val lib = new {
 		val cassie = "0.3.1"
 
     val jbcrypt = "0.4"
+
+		val apacheCLI = "1.4"
 	}
 
 	val akkaActor = "com.typesafe.akka" %% "akka-actor" % Version.akka
@@ -117,6 +121,8 @@ lazy val lib = new {
 	val cassieAkkaStream = "de.ioswarm" %% "cassie-akka-stream" % Version.cassie
 
 	val jbcrypt = "org.mindrot" % "jbcrypt" % Version.jbcrypt
+
+  val apacheCLI = "commons-cli" % "commons-cli" % Version.apacheCLI
 
 }
 
