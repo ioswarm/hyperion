@@ -3,7 +3,6 @@ package de.ioswarm.hyperion
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.event.LoggingAdapter
-import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -13,7 +12,8 @@ object Hyperion {
   def apply(implicit system: ActorSystem): Hyperion = new HyperionImpl(system)
   def apply(name: String): Hyperion = new HyperionImpl(ActorSystem(name))
 
-  private lazy val _config: Config = ConfigFactory.load().getConfig("hyperion")
+  private lazy val _config: Config = ConfigFactory.load("default-hyperion.conf")
+    .withFallback(ConfigFactory.load()).getConfig("hyperion")
   def config: Config = _config
 
   case object Initialize
