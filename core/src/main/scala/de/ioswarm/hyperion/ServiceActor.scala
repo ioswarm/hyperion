@@ -174,6 +174,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   implicit lazy val mat: ActorMaterializer = ActorMaterializer()
 
+  implicit val serviceContext: ServiceContext = new ServiceContext(context, log)
   val snapshotInterval: Int = service.snapshotInterval
   var value: Option[T] = service.value
 
@@ -186,7 +187,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
   def registerSelf(): Unit = register(self)
 
   def receiveEvent(value: Option[T], evt: Event): Option[T] = {
-    val x = service.eventReceive(value)(evt)
+    val x = service.eventReceive(serviceContext)(value)(evt)
     log.debug("Receive-Event {} for {} - old-value: {} - new-value: {}", evt, persistenceId, value, x)
     x
   }
@@ -203,7 +204,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   override def receiveCommand: Receive = {
     case cmd: Command =>
-      val action =  service.commandReceive(value)(cmd)
+      val action =  service.commandReceive(serviceContext)(value)(cmd)
       if (action.isPersistable) {
         persist(action.taggedValue) { evt =>
           log.debug("TAGGED: "+evt)
