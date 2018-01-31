@@ -10,13 +10,11 @@ trait QueryStream {
 
   def source(id: String, fromSeq: Long, toSeq: Long, system: ActorSystem): Source[EventEnvelope, NotUsed]
 
-  def sink: Sink[EventEnvelope, Any]
+  def sink(system: ActorSystem): Sink[EventEnvelope, Any]
 
   def run(id: String, fromSeq: Long, toSeq: Long)(implicit mat: Materializer, context: ActorContext): KillSwitch = source(id, fromSeq, toSeq, context.system)
     .viaMat(KillSwitches.single)(Keep.right)
-    .toMat(sink)(Keep.left)
+    .toMat(sink(context.system))(Keep.left)
     .run()
-
-
 
 }

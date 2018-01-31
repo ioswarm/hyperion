@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 import akka.persistence.query.scaladsl.ReadJournal
-import akka.persistence.{PersistentActor, SnapshotOffer}
+import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import akka.stream.{ActorMaterializer, KillSwitch, KillSwitches, UniqueKillSwitch}
 import akka.stream.scaladsl.Keep
 import com.typesafe.config.Config
@@ -180,7 +180,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   context.setReceiveTimeout(service.timeout)
 
-  val stream: Option[KillSwitch] = service.queryStream.map(q => q.run(persistenceId, lastSequenceNr, Long.MaxValue))
+  var stream: Option[KillSwitch] = None
 
   def canRegister: Boolean = !service.sharded
   def register(ref: ActorRef): Unit = if (canRegister) context.actorSelection(context.system / "hyperion") ! Register(ref)
@@ -200,6 +200,8 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
     case SnapshotOffer(_, snapshot: Any) =>
       log.debug("Recover snapshot: {}", snapshot)
       value = Some(snapshot.asInstanceOf[T])
+    case RecoveryCompleted =>
+      stream = service.queryStream.map(q => q.run(persistenceId, lastSequenceNr+1l, Long.MaxValue))
   }
 
   override def receiveCommand: Receive = {
