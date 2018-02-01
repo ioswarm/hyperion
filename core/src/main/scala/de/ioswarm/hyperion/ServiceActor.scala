@@ -208,7 +208,21 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   override def receiveCommand: Receive = {
     case cmd: Command =>
-      val fut: Future[Action[Event]] =  service.commandReceive(serviceContext)(value)(cmd)
+      val repl = sender()
+      log.debug("Receive command: {}", cmd)
+      val action = service.commandReceive(serviceContext)(value)(cmd)
+      log.debug("Got Action {}", action)
+      if (action.isPersistable) {
+        persist(action.taggedValue) { evt =>
+          log.debug("TAGGED: " + evt)
+          value = receiveEvent(value, evt.payload.asInstanceOf[Event])
+          if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
+            saveSnapshot(value.get)
+          if (action.isReplyable) repl ! evt.payload.asInstanceOf[Event]
+        }
+      } else if (action.isReplyable) repl ! action.value
+
+      /*val fut: Future[Action[Event]] =  service.commandReceive(serviceContext)(value)(cmd)
       val repl = sender()
       fut onComplete {
         case Success(action) =>
@@ -224,7 +238,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
         case Failure(e) =>
           receiveEvent(value, FailureEvent(e))
           //repl ! akka.actor.Status.Failure(e)
-      }
+      }*/
     case ReceiveTimeout =>
       log.debug("Receive timeout ... passivate persistenceId: "+persistenceId)
       if (service.sharded) context.parent ! Passivate(stopMessage = Stop)
