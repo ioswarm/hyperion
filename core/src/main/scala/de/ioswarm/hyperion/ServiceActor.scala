@@ -9,9 +9,10 @@ import akka.stream.{ActorMaterializer, KillSwitch, KillSwitches, UniqueKillSwitc
 import akka.stream.scaladsl.Keep
 import com.typesafe.config.Config
 import de.ioswarm.hyperion.Hyperion.{Stop, Stopped}
-import de.ioswarm.hyperion.model.{Command, Event}
+import de.ioswarm.hyperion.model.{Action, Command, Event, FailureEvent}
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 trait ServiceActor extends Actor with ActorLogging {
 
@@ -170,6 +171,7 @@ class ActorServiceActor(service: ActorService) extends ServiceActor {
 
 class PersistentServiceActor[T](service: PersistentService[T]) extends PersistentActor with ActorLogging {
 
+  import context.dispatcher
   import Hyperion._
 
   implicit lazy val mat: ActorMaterializer = ActorMaterializer()
@@ -206,16 +208,23 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
 
   override def receiveCommand: Receive = {
     case cmd: Command =>
-      val action =  service.commandReceive(serviceContext)(value)(cmd)
-      if (action.isPersistable) {
-        persist(action.taggedValue) { evt =>
-          log.debug("TAGGED: "+evt)
-          value = receiveEvent(value, evt.payload.asInstanceOf[Event])
-          if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
-            saveSnapshot(value.get)
-          if (action.isReplyable) sender() ! evt.payload.asInstanceOf[Event]
-        }
-      } else if (action.isReplyable) sender() ! action.value
+      val fut: Future[Action[Event]] =  service.commandReceive(serviceContext)(value)(cmd)
+      val repl = sender()
+      fut onComplete {
+        case Success(action) =>
+          if (action.isPersistable) {
+            persist(action.taggedValue) { evt =>
+              log.debug("TAGGED: " + evt)
+              value = receiveEvent(value, evt.payload.asInstanceOf[Event])
+              if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
+                saveSnapshot(value.get)
+              if (action.isReplyable) repl ! evt.payload.asInstanceOf[Event]
+            }
+          } else if (action.isReplyable) repl ! action.value
+        case Failure(e) =>
+          receiveEvent(value, FailureEvent(e))
+          //repl ! akka.actor.Status.Failure(e)
+      }
     case ReceiveTimeout =>
       log.debug("Receive timeout ... passivate persistenceId: "+persistenceId)
       if (service.sharded) context.parent ! Passivate(stopMessage = Stop)

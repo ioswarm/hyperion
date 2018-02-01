@@ -3,6 +3,8 @@ package de.ioswarm.hyperion.model
 import akka.Done
 import akka.persistence.journal.Tagged
 
+import scala.concurrent.Future
+
 abstract class Action[+T] extends Product with Serializable {
   def value: T
   def tags: Set[String]
@@ -11,6 +13,8 @@ abstract class Action[+T] extends Product with Serializable {
   def isTagged: Boolean = tags.nonEmpty
 
   def taggedValue: Tagged = Tagged(value, if (isTagged) tags else Set(this.getClass.getSimpleName))
+
+  def success: Future[Action[T]] = Future.successful(this)
 }
 
 case object Passive extends Action[Done] {

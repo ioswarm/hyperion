@@ -25,7 +25,7 @@ object Service {
   type Pipe[Mat] = ServiceContext => Future[Mat]
   type Stream[Mat] = Pipe[Mat]
 
-  type CommandReceive[T] = ServiceContext => Option[T] => PartialFunction[Command, Action[Event]]
+  type CommandReceive[T] = ServiceContext => Option[T] => PartialFunction[Command, Future[Action[Event]]]
   type EventReceive[T] = ServiceContext => Option[T] => PartialFunction[Event, Option[T]]
 
   val defaultExtractEntityId: ShardRegion.ExtractEntityId = {
@@ -256,7 +256,7 @@ trait PersistentService[T] extends Service {
   def command(c: CommandReceive[T]): PersistentService[T]
   def event(e: EventReceive[T]): PersistentService[T]
 
-  def commandReceive(ctx: ServiceContext)(value: Option[T]): PartialFunction[Command, Action[Event]] = {
+  def commandReceive(ctx: ServiceContext)(value: Option[T]): PartialFunction[Command, Future[Action[Event]]] = {
     require(commands.nonEmpty)
     val first = commands.head
     commands.aggregate(first(ctx)(value))( { (p, cmd) => p orElse cmd(ctx)(value) }, { (p1, p2) => p1 orElse p2 })
