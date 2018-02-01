@@ -188,17 +188,24 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
   def register(ref: ActorRef): Unit = if (canRegister) context.actorSelection(context.system / "hyperion") ! Register(ref)
   def registerSelf(): Unit = register(self)
 
-  def receiveEvent(value: Option[T], evt: Event): Option[T] = {
+  /*def receiveEvent(value: Option[T], evt: Event): Option[T] = {
     val x = service.eventReceive(serviceContext)(value)(evt)
     log.debug("Receive-Event {} for {} - old-value: {} - new-value: {}", evt, persistenceId, value, x)
     x
+  }*/
+
+  def receiveEvent(evt: Event): Unit = {
+    val x = service.eventReceive(serviceContext)(value)(evt)
+    log.debug("Receive-Event {} for {} - old-value: {} - new-value: {}", evt, persistenceId, value, x)
+    value = x
   }
 
   override def persistenceId: String = self.path.name
 
   override def receiveRecover: Receive = {
     case evt: Event =>
-      value = receiveEvent(value, evt)
+      /*value = receiveEvent(value, evt)*/
+      receiveEvent(evt)
     case SnapshotOffer(_, snapshot: Any) =>
       log.debug("Recover snapshot: {}", snapshot)
       value = Some(snapshot.asInstanceOf[T])
@@ -215,7 +222,8 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
       if (action.isPersistable) {
         persist(action.taggedValue) { evt =>
           log.debug("TAGGED: " + evt)
-          value = receiveEvent(value, evt.payload.asInstanceOf[Event])
+          /*value = receiveEvent(value, evt.payload.asInstanceOf[Event])*/
+          receiveEvent(evt.payload.asInstanceOf[Event])
           if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
             saveSnapshot(value.get)
           if (action.isReplyable) repl ! evt.payload.asInstanceOf[Event]
