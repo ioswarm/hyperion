@@ -67,7 +67,7 @@ trait App {
     lpth
   })
 
-  def startup(): Seq[Service] = Seq.empty[Service]
+  def startup(implicit system: ActorSystem): Seq[Service] = Seq.empty[Service]
 
   def main(args: Array[String]): Unit = {
     _cmdLine = new DefaultParser().parse(options, args)
@@ -95,7 +95,7 @@ trait App {
 
     implicit val hyperion: Hyperion = Hyperion(system)
 
-    hyperion.start(startup() :_*)
+    hyperion.start(startup(system) :_*)
 
     Await.result(hyperion.whenTerminated, Duration.Inf)
   }
