@@ -15,6 +15,8 @@ abstract class Action[+T] extends Product with Serializable {
   def taggedValue: Tagged = Tagged(value, if (isTagged) tags else Set(this.getClass.getSimpleName))
 
   def success: Future[Action[T]] = Future.successful(this)
+
+  def toList: List[Action[T]] = List(this)
 }
 
 case object Passive extends Action[Done] {
