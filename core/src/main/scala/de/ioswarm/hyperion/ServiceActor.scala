@@ -1,5 +1,6 @@
 package de.ioswarm.hyperion
 
+import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 import akka.persistence.query.scaladsl.ReadJournal
@@ -214,36 +215,31 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
     case cmd: Command =>
       val repl = sender()
       log.debug("Receive command: {}", cmd)
-      val action = service.commandReceive(serviceContext)(value)(cmd)
-      log.debug("Got Action {}", action)
-      if (action.isPersistable) {
-        persist(action.taggedValue) { evt =>
+      val actions = service.commandReceive(serviceContext)(value)(cmd)
+      log.debug("Got Actions {}", actions)
+
+      if (actions.size == 1) {
+        // v0.2.1 behavior
+        val action = actions.head
+        if (action.isPersistable) {
+          persist(action.taggedValue) { evt =>
+            log.debug("TAGGED: " + evt)
+            value = receiveEvent(value, evt.payload.asInstanceOf[Event])
+            /*receiveEvent(evt.payload.asInstanceOf[Event])*/
+            if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
+              saveSnapshot(value.get)
+            if (action.isReplyable) repl ! evt.payload.asInstanceOf[Event]
+          }
+        } else if (action.isReplyable) repl ! action.value
+      } else if (actions.size > 1) {
+        persistAll(actions.filter(_.isPersistable).map(_.taggedValue)){ evt =>
           log.debug("TAGGED: " + evt)
           value = receiveEvent(value, evt.payload.asInstanceOf[Event])
-          /*receiveEvent(evt.payload.asInstanceOf[Event])*/
           if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
             saveSnapshot(value.get)
-          if (action.isReplyable) repl ! evt.payload.asInstanceOf[Event]
         }
-      } else if (action.isReplyable) repl ! action.value
-
-      /*val fut: Future[Action[Event]] =  service.commandReceive(serviceContext)(value)(cmd)
-      val repl = sender()
-      fut onComplete {
-        case Success(action) =>
-          if (action.isPersistable) {
-            persist(action.taggedValue) { evt =>
-              log.debug("TAGGED: " + evt)
-              value = receiveEvent(value, evt.payload.asInstanceOf[Event])
-              if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
-                saveSnapshot(value.get)
-              if (action.isReplyable) repl ! evt.payload.asInstanceOf[Event]
-            }
-          } else if (action.isReplyable) repl ! action.value
-        case Failure(e) =>
-          receiveEvent(value, FailureEvent(e))
-          //repl ! akka.actor.Status.Failure(e)
-      }*/
+        if (actions.exists(_.isReplyable)) repl ! Done
+      }
     case ReceiveTimeout =>
       log.debug("Receive timeout ... passivate persistenceId: "+persistenceId)
       if (service.sharded) context.parent ! Passivate(stopMessage = Stop)
