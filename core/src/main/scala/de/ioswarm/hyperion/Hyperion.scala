@@ -1,114 +1,105 @@
 package de.ioswarm.hyperion
 
-import akka.Done
-import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import akka.event.LoggingAdapter
-import akka.util.Timeout
+import akka.http.scaladsl.server.Route
 import com.typesafe.config.{Config, ConfigFactory}
+import de.ioswarm.hyperion.Hyperion.Settings
+import de.ioswarm.hyperion.http.RouteAppender
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.Duration
 
 object Hyperion {
-  def apply(implicit system: ActorSystem): Hyperion = new HyperionImpl(system)
-  def apply(name: String): Hyperion = new HyperionImpl(ActorSystem(name))
-
-  private lazy val _config: Config = ConfigFactory.load("default-hyperion.conf")
-    .withFallback(ConfigFactory.load()).getConfig("hyperion")
-  def config: Config = _config
-
-  case object Initialize
-  final case class Initialized(ref: ActorRef)
-
-  final case class Register(ref: ActorRef)
-
-  final case class StartService(service: Service)
-  final case class ServiceStarted(service: Service, ref: ActorRef)
 
   case object Stop
-  final case class Stopped(ref: ActorRef)
 
-  case object Shutdown
+  final case class HttpAppendRoute(route: Route)
+
+  def apply(system: ActorSystem): Hyperion = apply(system, new Settings(system.settings.config))
+  def apply(system: ActorSystem, settings: Settings): Hyperion = new HyperionImpl(system, settings)
+
+  def apply(name: String): Hyperion = apply(ActorSystem(name))
+  def apply(name: String, config: Config): Hyperion = apply(ActorSystem(name, config))
+
+  def apply(): Hyperion = apply(ConfigFactory.load())
+  def apply(config: Config): Hyperion = {
+    val settings = new Settings(config)
+    apply(ActorSystem(settings.systemName, settings.config), settings)
+  }
+
+
+  class Settings(val config: Config) {
+
+    lazy val hyperionConfig: Config = config.getConfig("hyperion")
+
+    def systemName: String = hyperionConfig.getString("name")
+
+    def baseActorClassName: String = hyperionConfig.getString("internal.baseActor")
+    def httpActorClassName: String = hyperionConfig.getString("internal.httpActor")
+
+    def httpHost: String = hyperionConfig.getString("http.host")
+    def httpPort: Int = hyperionConfig.getInt("http.port")
+
+  }
 
 }
-trait Hyperion {
+
+abstract class Hyperion(val system: ActorSystem) extends AkkaProvider {
 
   def name: String = system.name
-  def system: ActorSystem
 
-  def config: Config = system.settings.config.getConfig("hyperion")
-  def log: LoggingAdapter = system.log
+  implicit def log: LoggingAdapter = system.log
 
-  def run(service: Service): Future[ActorRef]
-  def start(services: Service*): Future[ActorRef]
-  def stop(): Future[Done]
+  implicit def dispatcher: ExecutionContextExecutor = system.dispatcher
 
-  def terminate(): Future[Terminated] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    stop().flatMap {
-      case Done => system.terminate()
-    }
-  }
+  def actorOf(props: Props): ActorRef = system.actorOf(props)
 
-  def whenTerminated: Future[Terminated] = system.whenTerminated
+  def actorOf(props: Props, name: String): ActorRef = system.actorOf(props, name)
+
+  def config: Config = system.settings.config
+
+  def stop(actor: ActorRef): Unit = system.stop(actor)
+
+  def terminate(): Future[Terminated]
+
+  def whenTerminated: Future[Terminated]
+
+  def await(): Terminated = Await.result(whenTerminated, Duration.Inf)
 
 }
-private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
 
-  import akka.pattern.ask
-  import scala.concurrent.duration._
-  import scala.concurrent.ExecutionContext.Implicits.global
+private[hyperion] class HyperionImpl(system: ActorSystem, val settings: Settings) extends Hyperion(system) {
+
+  log.debug("Start hyperion-base-actor: {}", settings.baseActorClassName)
+
+  val hyperionRef: ActorRef = system.actorOf(Props(
+    Class.forName(settings.baseActorClassName)
+    , settings
+  ), "hyperion")
+
+  override def terminate(): Future[Terminated] = system.terminate()
+
+  override def whenTerminated: Future[Terminated] = system.whenTerminated
+
+  override def self: ActorRef = hyperionRef
+}
+
+
+private[hyperion] class HyperionActor(settings: Settings) extends Actor with ActorLogging {
+
   import Hyperion._
 
-  private var hyperionActor: Option[ActorRef] = None
+  val routeAppender: ActorRef = context.actorOf(Props(
+      classOf[RouteAppender]
+      , settings.httpHost
+      , settings.httpPort
+      , Class.forName(settings.httpActorClassName)
+    ), "routes")
 
-  private def hyperionService(services: Service*) = ActorServiceImpl(name = "hyperion", children = System(config) +: Management(config) +: services)
-
-  override def run(service: Service): Future[ActorRef] = {
-    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure service-startup-timeout
-
-    hyperionActor match {
-      case Some(ref) => for {
-        res <- ref ? StartService(service)
-      } yield res match {
-        case ServiceStarted(_, xref) => xref
-      }
-      case None => start(service)
-    }
-  }
-
-  override def start(services: Service*): Future[ActorRef] = hyperionActor match {
-    case Some(ref) =>
-      log.warning("Hyperion already started.")
-      Future.successful(ref)
-    case None =>
-      hyperionActor = Some(system.actorOf(Props(classOf[HyperionActor], hyperionService(services :_*)), "hyperion"))
-      implicit val timeout: Timeout = Timeout(60.seconds)  // TODO configure system-startup-timeout
-      hyperionActor match {
-        case Some(ref) => for {
-          res <- ref ? Initialize
-        } yield res match {
-          case Initialized(rref) => rref
-        }
-        case _ => Future.failed(new Exception("Error while initialize Services."))
-      }
-  }
-
-  override def stop(): Future[Done] = {
-    implicit val timeout: Timeout = Timeout(60.seconds)  // TODO configure service-stop-timeout
-
-    hyperionActor match {
-      case Some(ref) => for {
-        res <- ref ? Stop
-      } yield res match {
-        case Stopped(_) =>
-          hyperionActor = None
-          Done
-        case a: Any =>
-          println(s"STOP RECEIVED: $a")
-          Done
-      }
-      case None => Future.successful(Done)
-    }
+  def receive: Receive = {
+    case HttpAppendRoute(route) => routeAppender ! RouteAppender.AppendRoute(route)
+    case _ =>
   }
 
 }

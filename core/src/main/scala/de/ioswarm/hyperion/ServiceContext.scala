@@ -1,13 +1,16 @@
 package de.ioswarm.hyperion
 
-import akka.actor.{ActorContext, ActorPath, ActorRef, ActorSelection, ActorSystem}
+import akka.actor.{ActorContext, ActorRef, ActorSystem, Props}
 import akka.event.LoggingAdapter
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.typesafe.config.Config
+import de.ioswarm.hyperion
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.duration._
 
-class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
+private[hyperion] class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) extends AkkaProvider {
 
   implicit def context: ActorContext = actorContext
   implicit def log: LoggingAdapter = actorLogger
@@ -18,23 +21,18 @@ class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) {
 
   def config: Config = context.system.settings.config
 
-  def actorOf(service: Service): ActorRef = {
-    log.debug(s"Context start child-actor '${service.name}'")
-    context.child(service.name) match {
-      case Some(ref) => ref
-      case None => service.createActor(actorContext)
-    }
-  }
-
   def system: ActorSystem = context.system
 
-  def serviceSelection(path: ActorPath): ActorSelection = system.actorSelection(system / "hyperion" / path.elements)
-  def serviceSelection(elements: String*): ActorSelection = system.actorSelection(system / "hyperion" / elements)
+  lazy val settings: Hyperion.Settings = new hyperion.Hyperion.Settings(config)
 
-  def sender(): ActorRef = context.sender()
+  override def self: ActorRef = context.self
 
-  //def self(): ActorRef = context.self
-  implicit final val self: ActorRef = context.self
+  protected val resolveTimeout: Timeout = Timeout(2.seconds)
+  override lazy val hyperionRef: ActorRef = Await.result(system.actorSelection(system / "hyperion").resolveOne()(resolveTimeout), resolveTimeout.duration)
+
+  override def actorOf(props: Props): ActorRef = context.actorOf(props)
+
+  override def actorOf(props: Props, name: String): ActorRef = context.actorOf(props, name)
+
 
 }
-
