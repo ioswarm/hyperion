@@ -1,7 +1,6 @@
 package de.ioswarm.hyperion.demo
 
 import akka.actor.Actor
-import akka.http.scaladsl.server.Route
 import de.ioswarm.hyperion.App
 
 object SingleActorDemo extends App {
@@ -27,7 +26,6 @@ object SingleActorDemo extends App {
     import akka.util.Timeout
     import concurrent.duration._
     import akka.http.scaladsl.server.Directives._
-    import akka.http.scaladsl.model.StatusCodes._
 
     pathPrefix("echo" / Segment) { s =>
       get {
