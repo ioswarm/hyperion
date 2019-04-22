@@ -83,6 +83,8 @@ private[hyperion] class HyperionImpl(system: ActorSystem, val settings: Settings
   override def whenTerminated: Future[Terminated] = system.whenTerminated
 
   override def self: ActorRef = hyperionRef
+
+  override def sender(): ActorRef = self
 }
 
 
