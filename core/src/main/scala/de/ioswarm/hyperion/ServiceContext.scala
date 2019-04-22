@@ -27,6 +27,8 @@ private[hyperion] class ServiceContext(actorContext: ActorContext, actorLogger: 
 
   override def self: ActorRef = context.self
 
+  override def sender(): ActorRef = context.sender()
+
   protected val resolveTimeout: Timeout = Timeout(2.seconds)
   override lazy val hyperionRef: ActorRef = Await.result(system.actorSelection(system / "hyperion").resolveOne()(resolveTimeout), resolveTimeout.duration)
 
