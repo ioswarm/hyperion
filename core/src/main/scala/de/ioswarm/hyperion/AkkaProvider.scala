@@ -18,6 +18,8 @@ trait AkkaProvider {
 
   def self: ActorRef
 
+  def sender(): ActorRef
+
   def hyperionRef: ActorRef
 
   implicit def dispatcher: ExecutionContextExecutor
