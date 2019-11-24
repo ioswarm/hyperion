@@ -15,10 +15,12 @@ project/boot/
 project/plugins/project/
 lib/libsigar*
 
-# Demos
-Demo01
-
 # Scala-IDE specific
 .idea/
 .scala_dependencies
 .worksheet
+
+
+# leveldb
+journal
+snapshots
