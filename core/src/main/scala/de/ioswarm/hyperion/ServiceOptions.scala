@@ -12,9 +12,9 @@ final case class ServiceOptions(
                                , mailbox: String = Deploy.NoMailboxGiven
                                , routerConfig: RouterConfig = NoRouter
                                , timeout: Duration = Duration.Inf
-                               , onTimeout: ServiceCall = emptyCall
-                               , preStart: ServiceCall = emptyCall
-                               , postStop: ServiceCall = emptyCall
+                               , onTimeout: Service.ServiceCall = Service.emptyCall
+                               , preStart: Service.ServiceCall = Service.emptyCall
+                               , postStop: Service.ServiceCall = Service.emptyCall
                                ) {
 
   def withServiceActor(clazz: Class[_ <: ServiceActor]): ServiceOptions = copy(actorClass = clazz)
@@ -25,8 +25,8 @@ final case class ServiceOptions(
   def withRouterConfig(config: RouterConfig): ServiceOptions = copy(routerConfig = config)
   def withTimeout(duration: Duration): ServiceOptions = copy(timeout = duration)
 
-  def withOnTimeout(call: ServiceCall): ServiceOptions = copy(onTimeout = call)
-  def withPreStart(call: ServiceCall): ServiceOptions = copy(preStart = call)
-  def withPostStop(call: ServiceCall): ServiceOptions = copy(postStop = call)
+  def withOnTimeout(call: Service.ServiceCall): ServiceOptions = copy(onTimeout = call)
+  def withPreStart(call: Service.ServiceCall): ServiceOptions = copy(preStart = call)
+  def withPostStop(call: Service.ServiceCall): ServiceOptions = copy(postStop = call)
 
 }

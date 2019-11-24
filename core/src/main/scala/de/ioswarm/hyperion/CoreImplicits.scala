@@ -12,9 +12,9 @@ trait CoreImplicits {
 
     def withActor(clazz: Class[_]): DefaultService = withProps(Props(clazz))
 
-    def receive(receive: ServiceReceive): DefaultReceivableService = Service(s, receive)
+    def receive(receive: Service.ServiceReceive): DefaultReceivableService = Service(s, receive)
 
-    def command[T](data: T)(c: CommandReceive[T]) = DefaultPersistentService(
+    def command[T](data: T)(c: Service.CommandReceive[T]) = DefaultPersistentService(
       s
       , data
       , c
@@ -27,7 +27,7 @@ trait CoreImplicits {
 
   implicit class HYDefaultServiceExtender(ds: DefaultService) {
 
-    def withReceive(r: ServiceReceive): DefaultReceivableService = DefaultReceivableService(
+    def withReceive(r: Service.ServiceReceive): DefaultReceivableService = DefaultReceivableService(
       name = ds.name
       , receive = r
       , route = ds.route

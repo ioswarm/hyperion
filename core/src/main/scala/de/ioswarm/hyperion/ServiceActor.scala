@@ -18,7 +18,7 @@ abstract class ServiceActor(service: Service) extends Actor with ActorLogging {
 
   def onTimeout(): Unit = service.options.onTimeout(serviceContext)
 
-  def serviceReceive: ServiceReceive
+  def serviceReceive: Service.ServiceReceive
 
   def receive: Receive = serviceReceive(serviceContext)
 
@@ -32,7 +32,7 @@ abstract class ServiceActor(service: Service) extends Actor with ActorLogging {
 
 final class ReceivableServiceActor(service: ReceivableService) extends ServiceActor(service) {
 
-  override def serviceReceive: ServiceReceive = service.receive
+  override def serviceReceive: Service.ServiceReceive = service.receive
 
 }
 

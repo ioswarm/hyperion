@@ -9,7 +9,7 @@ import akka.http.scaladsl.server.{PathMatcher, Route}
 import akka.http.scaladsl.unmarshalling.FromEntityUnmarshaller
 import akka.stream.scaladsl.Sink
 import de.ioswarm.hyperion.model.AuthenticatedUser
-import de.ioswarm.hyperion.{AppendableService, AppendableServiceFacade, Service, ServiceContext, ServiceOptions, ServiceRoute, emptyRoute}
+import de.ioswarm.hyperion.{AppendableService, AppendableServiceFacade, Service, ServiceContext, ServiceOptions}
 import de.ioswarm.time.DateTime
 
 import scala.concurrent.duration._
@@ -128,7 +128,7 @@ object CRUD {
                                            , eventConsumer: Option[Sink[CRUDEvent[L, R, E], _]] = None
                                            , authenticate: Authenticate.AuthenticationMethod = Authenticate.NONE
                                            , authenticator: ContextualAuthenticator[AuthenticatedUser] = noneAuthenticator
-                                           , additionalRoute: ServiceRoute = emptyRoute
+                                           , additionalRoute: Service.ServiceRoute = Service.emptyRoute
                                            , children: List[Service] = List.empty
                                            ) extends CRUDServiceFacade[L, R, E, DefaultCRUDService[L, R, E]] {
 

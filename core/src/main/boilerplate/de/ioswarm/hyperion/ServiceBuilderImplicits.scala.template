@@ -8,7 +8,7 @@ trait ServiceBuilderImplicits {
 
     import ServiceBuilder._
 
-    def service(f: ServiceReceive): DefaultReceivableService = create(s)(f)
+    def service(f: Service.ServiceReceive): DefaultReceivableService = create(s)(f)
 
     [#def service([#s1: Service#])(f: ServiceContext => ([#ActorRef#]) => Actor.Receive): DefaultReceivableService = create(s, [#s1#])(f)#
     ]
