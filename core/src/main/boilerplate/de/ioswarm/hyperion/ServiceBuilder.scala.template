@@ -1,0 +1,19 @@
+package de.ioswarm.hyperion
+
+import akka.actor.{Actor, ActorRef}
+
+object ServiceBuilder {
+
+  def create(serviceName: String)(f: ServiceReceive): DefaultReceivableService = DefaultReceivableService(serviceName, f)
+
+  [#def create(serviceName: String, [#s1: Service#])(f: ServiceContext => ([#ActorRef#]) => Actor.Receive): DefaultReceivableService = DefaultReceivableService(
+    serviceName
+    , { implicit ctx =>
+      [#val ref1 = s1.run#
+      ]
+      f(ctx)([#ref1#])
+    }
+  )#
+  ]
+
+}
