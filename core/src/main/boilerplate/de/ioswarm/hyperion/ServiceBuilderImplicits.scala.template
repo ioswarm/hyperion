@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef}
 
 trait ServiceBuilderImplicits {
 
-  implicit class HYServiceBuilderStringExtender(s: String) {
+  implicit class _HYServiceBuilderStringExtender(val s: String) {
 
     import ServiceBuilder._
 
