@@ -29,6 +29,7 @@ trait Service { self =>
 
   def run(implicit provider: AkkaProvider): ActorRef = {
     val ref = provider.actorOf(props, name)
+    provider.log.debug("Run service '{}' at {}", name, ref.path.toString)
     if (hasRoute) provider.hyperionRef ! Hyperion.HttpAppendRoute(route(ref))
     ref
   }
