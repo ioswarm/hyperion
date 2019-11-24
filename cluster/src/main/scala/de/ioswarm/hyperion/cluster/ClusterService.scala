@@ -3,7 +3,7 @@ package de.ioswarm.hyperion.cluster
 import akka.actor.{ActorRef, PoisonPill, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
-import de.ioswarm.hyperion.{AkkaProvider, Hyperion, Service, ServiceFacade, ServiceOptions, ServiceRoute}
+import de.ioswarm.hyperion.{AkkaProvider, Hyperion, Service, ServiceFacade, ServiceOptions}
 
 trait ClusterService extends Service
 
