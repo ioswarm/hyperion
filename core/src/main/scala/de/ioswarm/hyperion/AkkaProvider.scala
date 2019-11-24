@@ -29,11 +29,12 @@ trait AkkaProvider {
   def actorOf(props: Props, name: String): ActorRef
 
   def actorOf(service: Service): ActorRef = {
-    import Hyperion._
+    /*import Hyperion._
 
     val ref = actorOf(service.props, service.name)
     if (service.hasRoute) hyperionRef ! HttpAppendRoute(service.route(ref))
-    ref
+    ref*/
+    service.run(this)
   }
 
 }

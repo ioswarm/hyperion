@@ -2,9 +2,7 @@ package de.ioswarm.hyperion
 
 import java.util.UUID
 
-import akka.actor.{Actor, Deploy, Props, SupervisorStrategy}
-import akka.routing.{NoRouter, RouterConfig}
-
+import akka.actor.{ActorRef, Props}
 
 object Service {
 
@@ -19,132 +17,136 @@ object Service {
 
 }
 
-trait Service {
+trait Service { self =>
 
   def name: String
-  def props: Props
   def route: ServiceRoute
+  def options: ServiceOptions
+
+  def props: Props
 
   def hasRoute: Boolean = route != emptyRoute
+
+  def run(implicit provider: AkkaProvider): ActorRef = {
+    val ref = provider.actorOf(props, name)
+    if (hasRoute) provider.hyperionRef ! Hyperion.HttpAppendRoute(route(ref))
+    ref
+  }
 
 }
 
 trait ServiceFacade[A <: ServiceFacade[A]] extends Service {
 
-  def dispatcher: String // = Deploy.NoDispatcherGiven
-  def mailbox: String // = Deploy.NoMailboxGiven
-  def router: RouterConfig // = NoRouter
-
   def withName(n: String): A
-  def withDispatcher(d: String): A
-  def withMailbox(m: String): A
-  def withRouter(r: RouterConfig): A
-
   def withRoute(r: ServiceRoute): A
   def route(r: ServiceRoute): A = withRoute(r)
+  def withServiceOptions(opt: ServiceOptions): A = withOptions(opt)
+  def withOptions(opt: ServiceOptions): A
 
 }
 
-object DefaultService {
-
-  def apply(
-            name: String
-            , props: Props
-            , route: ServiceRoute = emptyRoute
-            , dispatcher: String = Deploy.NoDispatcherGiven
-            , mailbox: String = Deploy.NoMailboxGiven
-            , router: RouterConfig = NoRouter
-           ): DefaultService = DefaultService(
-    name
-    , props
-      .withDispatcher(dispatcher)
-      .withMailbox(mailbox)
-      .withRouter(router)
-    , route
-  )
-
-}
-case class DefaultService(
+final case class DefaultService(
                          name: String
                          , props: Props
-                         , route: ServiceRoute
+                         , route: ServiceRoute = emptyRoute
+                         , options: ServiceOptions = ServiceOptions()
                          ) extends ServiceFacade[DefaultService] {
 
   override def withName(n: String): DefaultService = copy(name = n)
-
   override def withRoute(r: ServiceRoute): DefaultService = copy(route = r)
-
-  override def withDispatcher(d: String): DefaultService = copy(props = this.props.withDispatcher(d))
-
-  override def withMailbox(m: String): DefaultService = copy(props = this.props.withMailbox(m))
-
-  override def withRouter(r: RouterConfig): DefaultService = copy(props = this.props.withRouter(r))
-
-  override def dispatcher: String = props.dispatcher
-
-  override def mailbox: String = props.mailbox
-
-  override def router: RouterConfig = props.routerConfig
+  override def withOptions(opt: ServiceOptions): DefaultService = copy(options = opt)
 }
 
 trait ReceivableService extends Service {
 
-  def actorClass: Class[_]
   def receive: ServiceReceive
-  def supervisorStrategy: SupervisorStrategy // = SupervisorStrategy.defaultStrategy
-  @throws(classOf[Exception])
-  def preStart: ServiceCall // = emptyCall
-  @throws(classOf[Exception])
-  def postStop: ServiceCall // = emptyCall
 
 }
 
 trait ReceivableServiceFacade[A <: ReceivableServiceFacade[A]] extends ReceivableService with ServiceFacade[A] {
 
-  def withActorClass(clazz: Class[_]): A
   def withReceive(r: ServiceReceive): A
-  def withSupervisorStrategy(s: SupervisorStrategy): A
-  def withPreStart(ps: ServiceCall): A
-  def withPostStop(ps: ServiceCall): A
 
 }
 
-case class DefaultReceivableService(
+final case class DefaultReceivableService(
                                    name: String
                                    , receive: ServiceReceive = emptyBehavior
                                    , route: ServiceRoute = emptyRoute
-                                   , preStart: ServiceCall = emptyCall
-                                   , postStop: ServiceCall = emptyCall
-                                   , supervisorStrategy: SupervisorStrategy = SupervisorStrategy.defaultStrategy
-                                   , dispatcher: String = Deploy.NoDispatcherGiven
-                                   , mailbox: String = Deploy.NoMailboxGiven
-                                   , router: RouterConfig = NoRouter
-                                   , actorClass: Class[_] = classOf[ReceivableServiceActor]
+                                   , options: ServiceOptions = ServiceOptions(actorClass = classOf[ReceivableServiceActor])
                                    ) extends ReceivableServiceFacade[DefaultReceivableService] {
 
   override def withReceive(r: ServiceReceive): DefaultReceivableService = copy(receive = r)
 
   override def withRoute(r: ServiceRoute): DefaultReceivableService = copy(route = r)
 
-  override def withSupervisorStrategy(s: SupervisorStrategy): DefaultReceivableService = copy(supervisorStrategy = s)
-
-  override def withPreStart(ps: ServiceCall): DefaultReceivableService = copy(preStart = ps)
-
-  override def withPostStop(ps: ServiceCall): DefaultReceivableService = copy(postStop = ps)
-
   override def withName(n: String): DefaultReceivableService = copy(name = n)
 
-  override def withDispatcher(d: String): DefaultReceivableService = copy(dispatcher = d)
+  override def withOptions(opt: ServiceOptions): DefaultReceivableService = copy(options = opt)
 
-  override def withMailbox(m: String): DefaultReceivableService = copy(mailbox = m)
+  override def props: Props = Props(options.actorClass, this)
+    .withDispatcher(options.dispatcher)
+    .withMailbox(options.mailbox)
+    .withRouter(options.routerConfig)
 
-  override def withRouter(r: RouterConfig): DefaultReceivableService = copy(router = r)
+}
 
-  override def withActorClass(clazz: Class[_]): DefaultReceivableService = copy(actorClass = clazz)
 
-  override def props: Props = Props(actorClass, this)
-    .withDispatcher(dispatcher)
-    .withMailbox(mailbox)
-    .withRouter(router)
+trait PersistentService[T] extends Service {
+
+  def value: T
+  def commandReceive: CommandReceive[T]
+  def eventReceive: EventReceive[T]
+  def snapshotInterval: Int
+
+}
+
+trait PersistentServiceFacade[T, A <: PersistentServiceFacade[T, A]] extends PersistentService[T] with ServiceFacade[A] {
+
+  def withCommandReceive(cr: CommandReceive[T]): A
+  def command(cr: CommandReceive[T]): A = withCommandReceive(cr)
+  def withEventReceive(er: EventReceive[T]): A
+  def event(er: EventReceive[T]): A = withEventReceive(er)
+  def withSnapshotInterval(si: Int): A
+
+}
+
+final case class DefaultPersistentService[T](
+                                     name: String
+                                     , value: T
+                                     , commandReceive: CommandReceive[T]
+                                     , eventReceive: EventReceive[T]
+                                     , snapshotInterval: Int = Int.MaxValue
+                                     , route: ServiceRoute = emptyRoute
+                                     , options: ServiceOptions = ServiceOptions(actorClass = classOf[PersistentServiceActor[T]])
+                                   ) extends PersistentServiceFacade[T, DefaultPersistentService[T]] {
+
+  override def withCommandReceive(cr: CommandReceive[T]): DefaultPersistentService[T] = copy(commandReceive = cr)
+
+  override def withEventReceive(er: EventReceive[T]): DefaultPersistentService[T] = copy(eventReceive = er)
+
+  override def withSnapshotInterval(si: Int): DefaultPersistentService[T] = copy(snapshotInterval = si)
+
+  override def withName(n: String): DefaultPersistentService[T] = copy(name = n)
+
+  override def withOptions(opt: ServiceOptions): DefaultPersistentService[T] = copy(options = opt)
+
+  override def withRoute(r: ServiceRoute): DefaultPersistentService[T] = copy(route = r)
+
+  override def props: Props = Props(options.actorClass, this)
+    .withDispatcher(options.dispatcher)
+    .withMailbox(options.mailbox)
+    .withRouter(options.routerConfig)
+
+}
+
+trait AppendableService extends Service {
+  def children: List[Service]
+}
+
+trait AppendableServiceFacade[A <: AppendableServiceFacade[A]] extends AppendableService with ServiceFacade[A] {
+
+  def appendService(child: Service): A
+  def +(child: Service): A = appendService(child)
 
 }

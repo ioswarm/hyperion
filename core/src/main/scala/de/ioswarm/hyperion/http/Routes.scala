@@ -5,7 +5,8 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.directives.{BasicDirectives, CacheConditionDirectives, CodingDirectives, CookieDirectives, DebuggingDirectives, ExecutionDirectives, FileAndResourceDirectives, FileUploadDirectives, FormFieldDirectives, FramedEntityStreamingDirectives, FutureDirectives, HeaderDirectives, HostDirectives, MarshallingDirectives, MethodDirectives, MiscDirectives, ParameterDirectives, PathDirectives, RangeDirectives, RespondWithDirectives, RouteDirectives, SchemeDirectives, SecurityDirectives, TimeoutDirectives, WebSocketDirectives}
-import akka.http.scaladsl.server.{Directive0, Directive1, PathMatcher, PathMatchers, Route, RouteConcatenation}
+import akka.http.scaladsl.server.{Directive, Directive0, Directive1, PathMatcher, PathMatchers, Route, RouteConcatenation}
+import akka.stream.{ActorMaterializer, ActorMaterializerHelper}
 import akka.util.Timeout
 
 import scala.concurrent.duration._
@@ -37,27 +38,8 @@ trait Routes extends PathMatchers
   with SchemeDirectives
   with SecurityDirectives
   with WebSocketDirectives
-  with FramedEntityStreamingDirectives {
-
-
-  /* CORS */
-  private val CORSHeaders = List(
-    `Access-Control-Allow-Origin`.*,
-    `Access-Control-Allow-Credentials`(true),
-    `Access-Control-Allow-Headers`("Authorization","Content-Type", "X-Requested-With")
-  )
-
-  private def withCORSHeaders: Directive0 = {
-    respondWithHeaders(CORSHeaders)
-  }
-
-  def CORS(r: Route): Route = withCORSHeaders {
-    import akka.http.scaladsl.model.StatusCodes
-
-    options {
-      complete(HttpResponse(StatusCodes.OK).withHeaders(`Access-Control-Allow-Methods`(HttpMethods.OPTIONS, HttpMethods.POST, HttpMethods.PUT, HttpMethods.GET, HttpMethods.DELETE)))
-    } ~ r
-  }
+  with FramedEntityStreamingDirectives
+{
 
   /* Directives */
   def askService(mag: (ActorRef, Any), duration: FiniteDuration = 2.seconds): Directive1[Any] = askSuccess(mag, duration)
@@ -78,42 +60,43 @@ trait Routes extends PathMatchers
     onComplete(mag._1 ? mag._2)
   }
 
+  def extractContext: Directive1[RequestContext] = extract{ ctx =>
+    new RequestContext(ctx, ctx.materializer.asInstanceOf[ActorMaterializer].system)
+  }
 
   /* Methods */
-  def route[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = extractRequestContext { ctx =>
+  def route[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = extractRequestContext { ctx =>
     extractActorSystem { sys =>
-      val rt = path(pm).tapply(f(new RequestContext(ctx, sys)))
-
-      if (cors) CORS(rt) else rt
+      path(pm).tapply(f(new RequestContext(ctx, sys)))
     }
   }
 
-  def GET[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = get {
-    route(pm, cors)(f)
+  def GET[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = get {
+    route(pm)(f)
   }
 
-  def POST[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = post {
-    route(pm, cors)(f)
+  def POST[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = post {
+    route(pm)(f)
   }
 
-  def PUT[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = put {
-    route(pm, cors)(f)
+  def PUT[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = put {
+    route(pm)(f)
   }
 
-  def PATCH[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = patch {
-    route(pm, cors)(f)
+  def PATCH[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = patch {
+    route(pm)(f)
   }
 
-  def HEAD[L](pm:PathMatcher[L], cors: Boolean = false)(f:RequestContext => L => Route): Route = head {
-    route(pm, cors)(f)
+  def HEAD[L](pm:PathMatcher[L])(f:RequestContext => L => Route): Route = head {
+    route(pm)(f)
   }
 
-  def OPTIONS[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = options {
-    route(pm, cors)(f)
+  def OPTIONS[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = options {
+    route(pm)(f)
   }
 
-  def DELETE[L](pm: PathMatcher[L], cors: Boolean = false)(f: RequestContext => L => Route): Route = delete {
-    route(pm, cors)(f)
+  def DELETE[L](pm: PathMatcher[L])(f: RequestContext => L => Route): Route = delete {
+    route(pm)(f)
   }
 
 }

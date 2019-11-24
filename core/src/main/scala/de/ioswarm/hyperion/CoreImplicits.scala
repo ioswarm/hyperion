@@ -14,11 +14,14 @@ trait CoreImplicits {
 
     def receive(receive: ServiceReceive): DefaultReceivableService = Service(s, receive)
 
-  }
-
-  implicit class HYServiceExtender(s: Service) {
-
-    def run(implicit provider: AkkaProvider): ActorRef = provider.actorOf(s)
+    def command[T](data: T)(c: CommandReceive[T]) = DefaultPersistentService(
+      s
+      , data
+      , c
+      , { implicit ctx => a: T => {
+        case _ => a
+      }}
+    )
 
   }
 
@@ -28,14 +31,12 @@ trait CoreImplicits {
       name = ds.name
       , receive = r
       , route = ds.route
-      , dispatcher = ds.dispatcher
-      , mailbox = ds.mailbox
-      , router = ds.router
+      , options = ds.options.withServiceActor(classOf[ReceivableServiceActor])
     )
 
   }
 
-  def run(service: Service)(implicit provider: AkkaProvider): ActorRef = provider.actorOf(service)
+  def run(service: Service)(implicit provider: AkkaProvider): ActorRef = service.run  //provider.actorOf(service)
   def applyRoute(route: Route)(implicit provider: AkkaProvider): Unit = provider.hyperionRef ! HttpAppendRoute(route)
 
 }

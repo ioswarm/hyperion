@@ -4,17 +4,21 @@ import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.server.Route
 import com.typesafe.config.{Config, ConfigFactory}
-import de.ioswarm.hyperion.Hyperion.Settings
-import de.ioswarm.hyperion.http.RouteAppender
+import de.ioswarm.hyperion.Hyperion.{HttpAppendMiddleware, Settings}
+import de.ioswarm.hyperion.http.{Middleware, RouteAppender}
+import de.ioswarm.hyperion.utils.Reflect
 
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.Duration
 
 object Hyperion {
 
+  import de.ioswarm.hyperion.http._
+
   case object Stop
 
   final case class HttpAppendRoute(route: Route)
+  final case class HttpAppendMiddleware(middleware: Middleware)
 
   def apply(system: ActorSystem): Hyperion = apply(system, new Settings(system.settings.config))
   def apply(system: ActorSystem, settings: Settings): Hyperion = new HyperionImpl(system, settings)
@@ -30,6 +34,7 @@ object Hyperion {
 
 
   class Settings(val config: Config) {
+    import collection.JavaConverters._
 
     lazy val hyperionConfig: Config = config.getConfig("hyperion")
 
@@ -38,9 +43,12 @@ object Hyperion {
     def baseActorClassName: String = hyperionConfig.getString("internal.baseActor")
     def httpActorClassName: String = hyperionConfig.getString("internal.httpActor")
 
+    private[hyperion] def internalMiddleware: List[String] = hyperionConfig.getStringList("internal.middleware").asScala.toList
+
     def httpHost: String = hyperionConfig.getString("http.host")
     def httpPort: Int = hyperionConfig.getInt("http.port")
 
+    def middleware: List[String] = hyperionConfig.getStringList("http.middleware").asScala.toList
   }
 
 }
@@ -67,6 +75,8 @@ abstract class Hyperion(val system: ActorSystem) extends AkkaProvider {
 
   def await(): Terminated = Await.result(whenTerminated, Duration.Inf)
 
+  def middleware(middleware: Middleware): Unit
+
 }
 
 private[hyperion] class HyperionImpl(system: ActorSystem, val settings: Settings) extends Hyperion(system) {
@@ -85,6 +95,8 @@ private[hyperion] class HyperionImpl(system: ActorSystem, val settings: Settings
   override def self: ActorRef = hyperionRef
 
   override def sender(): ActorRef = self
+
+  override def middleware(middleware: Middleware): Unit = hyperionRef ! HttpAppendMiddleware(middleware)
 }
 
 
@@ -99,8 +111,26 @@ private[hyperion] class HyperionActor(settings: Settings) extends Actor with Act
       , Class.forName(settings.httpActorClassName)
     ), "routes")
 
+  context.watch(routeAppender)
+
+  def loadMiddleware(paths: List[String]): Unit = paths.foreach{ pth =>
+      try {
+        log.debug("\t{}", pth.replace("#", " -> "))
+        routeAppender ! RouteAppender.AppendMiddleware(Reflect.execPath[Middleware](pth))
+      } catch {
+        case e: Exception => log.error(e, "Could not create an instance of {}", pth)
+      }
+    }
+
+  log.debug("Attach internal middleware")
+  loadMiddleware(settings.internalMiddleware)
+
+  log.debug("Attach middleware")
+  loadMiddleware(settings.middleware)
+
   def receive: Receive = {
     case HttpAppendRoute(route) => routeAppender ! RouteAppender.AppendRoute(route)
+    case HttpAppendMiddleware(middleware) => routeAppender ! RouteAppender.AppendMiddleware(middleware)
     case _ =>
   }
 

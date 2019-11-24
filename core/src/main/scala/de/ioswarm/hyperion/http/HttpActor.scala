@@ -1,9 +1,12 @@
 package de.ioswarm.hyperion.http
 
+import java.util.UUID
+
 import akka.NotUsed
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.server.Route
 import akka.pattern.pipe
@@ -11,8 +14,10 @@ import akka.stream.{ActorMaterializer, FlowShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Sink, Unzip, Zip}
 import akka.util.Timeout
 import de.ioswarm.hyperion.Hyperion
+import de.ioswarm.hyperion.model.HttpMetric
+import de.ioswarm.time.DateTime
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.Success
 
 object HttpActor {
@@ -49,28 +54,47 @@ private[hyperion] class HttpActor(host: String, port: Int, route: Route) extends
       import GraphDSL.Implicits._
       import  HttpActor._
 
-      val enrich = b.add(Flow[HttpRequest].map{ r => (r, (System.currentTimeMillis(), r))})
-      val uz = b.add(Unzip[HttpRequest, (Long, HttpRequest)])
+      val iSession = b.add(Flow[HttpRequest].map{r =>
+        if (!r.headers.exists(h => h.lowercaseName() == "x-internal-session"))
+          r.copy(headers = r.headers ++ Seq(RawHeader("X-INTERNAL-SESSION", UUID.randomUUID().toString)))
+        else
+          r
+      })
+      val enrich = b.add(Flow[HttpRequest].map{ r => (r, (DateTime(), r))})
+      val uz = b.add(Unzip[HttpRequest, (DateTime, HttpRequest)])
       val bc = b.add(Broadcast[HttpResponse](2))
-      val zip = b.add(Zip[(Long, HttpRequest), HttpResponse])
-      val metric = b.add(Flow[((Long, HttpRequest), HttpResponse)].map{ r =>
-        import de.ioswarm.hyperion.utils.Time._
+      val zip = b.add(Zip[(DateTime, HttpRequest), HttpResponse])
+      val metric = b.add(Flow[((DateTime, HttpRequest), HttpResponse)].map{ r =>
 
-        val startTime = r._1._1.toUtc
-        val endTime = System.currentTimeMillis().toUtc
+        val startTime = r._1._1
         val req = r._1._2
         val resp = r._2
 
-        HttpMetric(startTime, endTime, req, resp)
+        HttpMetric(
+          startTime
+          , s"${req.method} ${req.uri}"
+          , None
+          , req.headers.map(h => s"request.${h.name()}" -> h.value()).toMap ++ resp.headers.map(h => s"response.${h.name()}" -> h.value).toMap
+          , Set.empty
+          , DateTime()
+          , req.protocol.value
+          , req.method.value
+          , req.uri.scheme
+          , req.uri.authority.host.address()
+          , req.uri.authority.port
+          , req.uri.path.toString()
+          , req.uri.fragment
+          , req.uri.rawQueryString
+        )
       })
 
-      enrich ~> uz.in
+      iSession ~> enrich ~> uz.in
       uz.out0 ~> hdl     ~> bc
       zip.in1 <~ bc.out(1)
       uz.out1 ~> zip.in0
-      zip.out ~> metric ~> Sink.foreach(println) //Sink.actorRefWithAck(metricsActor, Init, Ack, Complete)
+      zip.out ~> metric ~> Sink.actorRefWithAck(metricsActor, Init, Ack, Complete)
 
-      FlowShape(enrich.in, bc.out(0))
+      FlowShape(iSession.in, bc.out(0))
     }
   )
 

@@ -18,5 +18,13 @@ trait Completes {
   def OK: Route = complete(StatusCodes.OK)
   def OK[T](t: T)(implicit m: ToEntityMarshaller[T]): Route = complete(StatusCodes.OK, t)
 
+  def Created: Route = complete(StatusCodes.Created)
+  def Created[T](t: T)(implicit m: ToEntityMarshaller[T]): Route = complete(StatusCodes.Created, t)
+
+  def NoContent: Route = complete(StatusCodes.NoContent)
+
+  def NotFound: Route = complete(StatusCodes.NotFound)
   // TODO impl rest of status-codes
 }
+
+object Completes extends Completes
