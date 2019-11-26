@@ -42,11 +42,13 @@ object CRUD {
   def emptyCRUDUpdate[L, R, E]: CRUDUpdate[L, R, E] = { _ => _ => Future.successful(None)}
   def emptyCRUDDelete[L, R, E]: CRUDDelete[L, R, E] = { _ => _ => Future.successful(None)}
 
-  implicit class _ServiceExtender(val s: Service) {
+  type AdditionalRoute[T] = T => Service.ServiceRoute
+
+  /*implicit class _ServiceExtender(val s: Service) {
 
     def crud[L, E](pm: PathMatcher[L], entityClass: Class[E]): Service = s
 
-  }
+  }*/
 
   implicit class _PathMatcherExtender[L](val pm: PathMatcher[L]) {
 
@@ -85,6 +87,9 @@ object CRUD {
 
     def authenticate: Authenticate.AuthenticationMethod
     def authenticator: ContextualAuthenticator[AuthenticatedUser]
+
+    def outerRoute: AdditionalRoute[L]
+    def innerRoute: AdditionalRoute[R]
   }
 
   trait CRUDServiceFacade[L, R, E, A <: CRUDServiceFacade[L, R, E, A]] extends CRUDService[L, R, E] with AppendableServiceFacade[A] {
@@ -108,6 +113,9 @@ object CRUD {
     def withAuthenticate(am: Authenticate.AuthenticationMethod): A
     def withAuthenticator(a: ContextualAuthenticator[AuthenticatedUser]): A
 
+    def withOuterRoute(f: AdditionalRoute[L]): A
+    def withInnerRoute(f: AdditionalRoute[R]): A
+
   }
 
   final case class DefaultCRUDService[L, R, E](
@@ -128,7 +136,8 @@ object CRUD {
                                            , eventConsumer: Option[Sink[CRUDEvent[L, R, E], _]] = None
                                            , authenticate: Authenticate.AuthenticationMethod = Authenticate.NONE
                                            , authenticator: ContextualAuthenticator[AuthenticatedUser] = noneAuthenticator
-                                           , additionalRoute: Service.ServiceRoute = Service.emptyRoute
+                                           , outerRoute: AdditionalRoute[L] = (_: L) => Service.emptyRoute
+                                           , innerRoute: AdditionalRoute[R] = (_: R) => Service.emptyRoute
                                            , children: List[Service] = List.empty
                                            ) extends CRUDServiceFacade[L, R, E, DefaultCRUDService[L, R, E]] {
 
@@ -163,7 +172,7 @@ object CRUD {
               case None => complete(BadRequest) // TODO result message
             }
           }
-        }
+        } ~ outerRoute(t)(ref)
       } ~
       pathPrefix(innerPathMatcher).tapply { t =>
         pathEndOrSingleSlash {
@@ -222,8 +231,8 @@ object CRUD {
               case UFailure(t) => failWith(t) // TODO result message, catch timeout exceptions for special status-code
             }
           }
-        }
-      } ~ additionalRoute(ref)
+        } ~ innerRoute(t)(ref)
+      }
 
       authenticate match {
         case Authenticate.BASIC =>
@@ -244,7 +253,7 @@ object CRUD {
 
     override def withName(n: String): DefaultCRUDService[L, R, E] = copy(name = n)
 
-    override def withRoute(r: ServiceRoute): DefaultCRUDService[L, R, E] = copy(additionalRoute = r)
+    override def withRoute(r: ServiceRoute): DefaultCRUDService[L, R, E] = throw new IllegalArgumentException()
 
     override def withOptions(opt: ServiceOptions): DefaultCRUDService[L, R, E] = copy(options = opt)
 
@@ -285,6 +294,10 @@ object CRUD {
     override def withAuthenticate(am: Authenticate.AuthenticationMethod): DefaultCRUDService[L, R, E] = copy(authenticate = am)
 
     override def withAuthenticator(a: ContextualAuthenticator[AuthenticatedUser]): DefaultCRUDService[L, R, E] = copy(authenticator = a)
+
+    override def withOuterRoute(f: AdditionalRoute[L]): DefaultCRUDService[L, R, E] = copy(outerRoute = f)
+
+    override def withInnerRoute(f: AdditionalRoute[R]): DefaultCRUDService[L, R, E] = copy(innerRoute = f)
   }
 
 }
