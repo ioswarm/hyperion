@@ -63,7 +63,9 @@ message ExceptionMessage {
 
 
 
-message AuthenticatedUser {
+message User {
+    option (scalapb.message).extends = "de.ioswarm.hyperion.model.AuthenticatedUser";
+
     string username = 1;
     map<string, string> meta = 2;
 }
