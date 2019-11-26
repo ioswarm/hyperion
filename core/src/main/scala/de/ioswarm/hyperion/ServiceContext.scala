@@ -25,6 +25,8 @@ private[hyperion] class ServiceContext(actorContext: ActorContext, actorLogger: 
 
   lazy val settings: Hyperion.Settings = new hyperion.Hyperion.Settings(config)
 
+  def parent: ActorRef = actorContext.parent
+
   override def self: ActorRef = context.self
 
   override def sender(): ActorRef = context.sender()
