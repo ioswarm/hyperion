@@ -38,7 +38,7 @@ lazy val api = project.in(file("api"))
 		, PB.targets in Compile := Seq(
 			scalapb.gen() -> (sourceManaged in Compile).value
 		)
-		, PB.protoSources in Compile := Seq(file("api/src/main/protobuf"))
+		, PB.protoSources in Compile := Seq(file("api/src/main/resources/de/ioswarm/hyperion"))
 	)
 
 lazy val core = project.in(file("core"))
