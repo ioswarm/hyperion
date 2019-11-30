@@ -21,9 +21,9 @@ trait App {
     println(s"${_name} ended after ${System.currentTimeMillis()-appStartedAt} ms")
   }
 
-  def systemName(): String = hyperion.settings.systemName
+  def systemName(): String = _name
 
-  def actorSystem(): ActorSystem = hyperion.system
+  implicit val actorSystem: ActorSystem = hyperion.system
 
   def main(args: Array[String]): Unit = {
     _args = args
