@@ -10,13 +10,13 @@ object RouteAppender {
   final case class AppendMiddleware(middleware: Middleware)
 
   sealed trait ServerState
-  case object Down extends ServerState
-  case object Up extends ServerState
-  case object Initialize extends ServerState
+  private[http] case object Down extends ServerState
+  private[http] case object Up extends ServerState
+  private[http] case object Initialize extends ServerState
 
   sealed trait RouteData
-  case object NoRoute extends RouteData
-  final case class Routes(route: Option[Route], middleware: Option[Middleware]) extends RouteData {
+  private[http] case object NoRoute extends RouteData
+  private[http] final case class Routes(route: Option[Route], middleware: Option[Middleware]) extends RouteData {
     import akka.http.scaladsl.server.Directives._
 
     def isDefined: Boolean = route.isDefined
