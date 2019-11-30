@@ -40,7 +40,7 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
     case r: ReadEntity[L, R, E]   =>
       onRead(ctx)(r)
         .map{entity =>
-          entity.foreach{ e => eventReceiver.foreach{ ref => ref ! EntityRead(r.params, e, r.user)}}
+          // entity.foreach{ e => eventReceiver.foreach{ ref => ref ! EntityRead(r.params, e, r.user)}}
           Result(entity)
         }
         .pipeTo(context.sender())

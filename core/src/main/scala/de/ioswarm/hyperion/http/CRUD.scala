@@ -10,7 +10,7 @@ import akka.http.scaladsl.unmarshalling.FromEntityUnmarshaller
 import akka.stream.scaladsl.Sink
 import de.ioswarm.hyperion.Service.ServiceReceive
 import de.ioswarm.hyperion.model.AuthenticatedUser
-import de.ioswarm.hyperion.{AppendableService, AppendableServiceFacade, Service, ServiceContext, ServiceOptions}
+import de.ioswarm.hyperion.{AppendableService, AppendableServiceFacade, ReceivableService, Service, ServiceContext, ServiceOptions}
 import de.ioswarm.time.DateTime
 
 import scala.concurrent.duration._
@@ -29,7 +29,7 @@ object CRUD {
 
   sealed trait CRUDEvent[L, R, E]
   final case class EntityCreated[L, R, E](params: L, entity: E, user: Option[AuthenticatedUser], timestamp: DateTime = DateTime()) extends CRUDEvent[L, R, E]
-  final case class EntityRead[L, R, E](params: R, entity: E, user: Option[AuthenticatedUser], timestamp: DateTime = DateTime()) extends CRUDEvent[L, R, E]
+  //final case class EntityRead[L, R, E](params: R, entity: E, user: Option[AuthenticatedUser], timestamp: DateTime = DateTime()) extends CRUDEvent[L, R, E]
   final case class EntityUpdated[L, R, E](params: R, oldEntity: E, entity: E, user: Option[AuthenticatedUser], timestamp: DateTime = DateTime()) extends CRUDEvent[L, R, E]
   final case class EntityDeleted[L, R, E](params: R, entity: E, user: Option[AuthenticatedUser], timestamp: DateTime = DateTime()) extends CRUDEvent[L, R, E]
 
@@ -51,7 +51,7 @@ object CRUD {
 
   }*/
 
-  implicit class _PathMatcherExtender[L](val pm: PathMatcher[L]) {
+  implicit class _PathMatcherExtender[L](val pm: PathMatcher[L]) extends AnyVal {
 
     import akka.http.scaladsl.server.PathMatchers.Segment
 
@@ -64,7 +64,6 @@ object CRUD {
     )
 
   }
-
 
   trait CRUDService[L, R, E] extends AppendableService {
 
