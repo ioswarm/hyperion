@@ -30,6 +30,12 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
   def serviceReceive: Service.ServiceReceive = service.receive
 
   def crudReceive: Service.ServiceReceive = ctx => {
+    case l: ListEntities[L, R, E] =>
+      onList(ctx)(l)
+        .map{ entities =>
+          ListResult(entities)
+        }
+        .pipeTo(context.sender())
     case c: CreateEntity[L, R, E] =>
       onCreate(ctx)(c)
         .map{entity =>
@@ -40,7 +46,6 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
     case r: ReadEntity[L, R, E]   =>
       onRead(ctx)(r)
         .map{entity =>
-          // entity.foreach{ e => eventReceiver.foreach{ ref => ref ! EntityRead(r.params, e, r.user)}}
           Result(entity)
         }
         .pipeTo(context.sender())
@@ -62,6 +67,7 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
 
   override def receive: Receive = crudReceive(serviceContext) orElse serviceReceive(serviceContext)
 
+  def onList: CRUDList[L, R, E]
   def onCreate: CRUDCreate[L, R, E]
   def onRead: CRUDRead[L, R, E]
   def onUpdate: CRUDUpdate[L, R, E]
@@ -71,6 +77,7 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
 
 final class DefaultCRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends CRUDServiceActor(service) {
 
+  def onList: CRUDList[L, R, E] = service.onList
   def onCreate: CRUDCreate[L, R, E] = service.onCreate
   def onRead: CRUDRead[L, R, E] = service.onRead
   def onUpdate: CRUDUpdate[L, R, E] = service.onUpdate
