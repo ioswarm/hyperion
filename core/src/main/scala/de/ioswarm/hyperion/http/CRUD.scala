@@ -8,6 +8,7 @@ import akka.http.scaladsl.server.util.TupleOps.Join
 import akka.http.scaladsl.server.{PathMatcher, Route}
 import akka.http.scaladsl.unmarshalling.FromEntityUnmarshaller
 import akka.stream.scaladsl.Sink
+import de.ioswarm.hyperion.Service.ServiceReceive
 import de.ioswarm.hyperion.model.AuthenticatedUser
 import de.ioswarm.hyperion.{AppendableService, AppendableServiceFacade, Service, ServiceContext, ServiceOptions}
 import de.ioswarm.time.DateTime
@@ -90,6 +91,8 @@ object CRUD {
 
     def outerRoute: AdditionalRoute[L]
     def innerRoute: AdditionalRoute[R]
+
+    def receive: Service.ServiceReceive
   }
 
   trait CRUDServiceFacade[L, R, E, A <: CRUDServiceFacade[L, R, E, A]] extends CRUDService[L, R, E] with AppendableServiceFacade[A] {
@@ -116,6 +119,8 @@ object CRUD {
     def withOuterRoute(f: AdditionalRoute[L]): A
     def withInnerRoute(f: AdditionalRoute[R]): A
 
+    def withReceive(rec: Service.ServiceReceive): A
+
   }
 
   final case class DefaultCRUDService[L, R, E](
@@ -132,6 +137,7 @@ object CRUD {
                                            , readTimeout: FiniteDuration = 500.millis
                                            , updateTimeout: FiniteDuration = 500.millis
                                            , deleteTimeout: FiniteDuration = 500.millis
+                                           , receive: Service.ServiceReceive = Service.emptyBehavior
                                            , options: ServiceOptions = ServiceOptions(actorClass = classOf[DefaultCRUDServiceActor[L, R, E]], dispatcher = "crud-dispatcher")
                                            , eventConsumer: Option[Sink[CRUDEvent[L, R, E], _]] = None
                                            , authenticate: Authenticate.AuthenticationMethod = Authenticate.NONE
@@ -298,6 +304,8 @@ object CRUD {
     override def withOuterRoute(f: AdditionalRoute[L]): DefaultCRUDService[L, R, E] = copy(outerRoute = f)
 
     override def withInnerRoute(f: AdditionalRoute[R]): DefaultCRUDService[L, R, E] = copy(innerRoute = f)
+
+    override def withReceive(rec: ServiceReceive): DefaultCRUDService[L, R, E] = copy(receive = rec)
   }
 
 }

@@ -27,7 +27,9 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
     super.preStart()
   }
 
-  def serviceReceive: Service.ServiceReceive = ctx => {
+  def serviceReceive: Service.ServiceReceive = service.receive
+
+  def crudReceive: Service.ServiceReceive = ctx => {
     case c: CreateEntity[L, R, E] =>
       onCreate(ctx)(c)
         .map{entity =>
@@ -57,6 +59,8 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
         }
         .pipeTo(context.sender())
   }
+
+  override def receive: Receive = crudReceive(serviceContext) orElse serviceReceive(serviceContext)
 
   def onCreate: CRUDCreate[L, R, E]
   def onRead: CRUDRead[L, R, E]
