@@ -10,7 +10,7 @@ import de.ioswarm.hyperion
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 
-private[hyperion] class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) extends AkkaProvider {
+class ServiceContext(actorContext: ActorContext, actorLogger: LoggingAdapter) extends AkkaProvider {
 
   implicit def context: ActorContext = actorContext
   implicit def log: LoggingAdapter = actorLogger
