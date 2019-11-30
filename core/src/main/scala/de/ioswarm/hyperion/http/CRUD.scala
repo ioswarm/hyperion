@@ -132,7 +132,7 @@ object CRUD {
                                            , readTimeout: FiniteDuration = 500.millis
                                            , updateTimeout: FiniteDuration = 500.millis
                                            , deleteTimeout: FiniteDuration = 500.millis
-                                           , options: ServiceOptions = ServiceOptions(actorClass = classOf[DefaultCRUDServiceActor[L, R, E]])
+                                           , options: ServiceOptions = ServiceOptions(actorClass = classOf[DefaultCRUDServiceActor[L, R, E]], dispatcher = "crud-dispatcher")
                                            , eventConsumer: Option[Sink[CRUDEvent[L, R, E], _]] = None
                                            , authenticate: Authenticate.AuthenticationMethod = Authenticate.NONE
                                            , authenticator: ContextualAuthenticator[AuthenticatedUser] = noneAuthenticator
