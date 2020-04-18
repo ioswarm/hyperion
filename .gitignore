@@ -24,3 +24,5 @@ lib/libsigar*
 # leveldb
 journal
 snapshots
+
+null
