@@ -1,7 +1,7 @@
 lazy val settings = Seq(
 	name := "hyperion"
 	, organization := "de.ioswarm"
-	, version := "0.3.1"
+	, version := "0.3.3-2"
 	, scalaVersion := "2.12.8"
 	, scalacOptions ++= Seq(
 		"-language:_"
@@ -18,11 +18,7 @@ lazy val hyperion = project.in(file("."))
 		, api
 		, cluster
 
-		, jsonArgonaut
-
-		, connectionApi
-		, connectionJDBC
-		, connectionDerby
+		, mongo
 	)
 
 lazy val api = project.in(file("api"))
@@ -34,6 +30,10 @@ lazy val api = project.in(file("api"))
 			, lib.akkaRemote
 			, lib.time
 			, lib.runtimeLib
+			, lib.scalaReflect
+
+			, lib.argonaut
+			, lib.timeArgonaut
 		)
 		, PB.targets in Compile := Seq(
 			scalapb.gen() -> (sourceManaged in Compile).value
@@ -49,6 +49,11 @@ lazy val core = project.in(file("core"))
 			lib.akkaStream
 			, lib.akkaHttp
 			, lib.akkaPersistence
+
+			, lib.akkaSLF4J
+			, lib.logback
+
+			, lib.hseebergerArgonaut
 
 			, lib.levelDB
 		)
@@ -72,6 +77,7 @@ lazy val cluster = project.in(file("cluster"))
 			, lib.akkaClusterSharding
 
 			, lib.multiNode
+			, lib.levelDB
 		)
 	)
   .dependsOn(
@@ -79,20 +85,17 @@ lazy val cluster = project.in(file("cluster"))
 	)
 
 
-lazy val jsonArgonaut = project.in(file("json/argonaut"))
+lazy val mongo = project.in(file("cli/mongo"))
   .settings(settings)
   .settings(
-		name := "hyperion-json-argonaut"
+		name := "hyperion-cli-mongo"
 		, libraryDependencies ++= Seq(
-			lib.argonaut
-			, lib.timeArgonaut
-			, lib.hseebergerArgonaut
+			lib.mongo
 		)
 	)
   .dependsOn(
-		api
+		core
 	)
-
 
 
 lazy val connectionApi = project.in(file("connection/api"))
@@ -133,19 +136,27 @@ lazy val connectionDerby = project.in(file("connection/jdbc/derby"))
 
 lazy val lib = new {
 	object Version {
+		val scala = "2.12.8"
+
 		val akka = "2.5.21"
 		val akkaHttp = "10.1.7"
+
+		val logback = "1.2.3"
 
 		val argonaut = "6.2.2"
 		val hseebergerArgonaut = "1.25.2"
 
-		val time = "0.1.0"
+		val time = "0.1.1"
 
 		val levelDB = "1.8"
+
+		val mongo = "2.6.0"
 
 		val hikari = "3.3.1"
 		val derby = "10.13.1.1"
 	}
+
+	val scalaReflect = "org.scala-lang" % "scala-reflect" % Version.scala
 
 	val akkaActor = "com.typesafe.akka" %% "akka-actor" % Version.akka
 	val akkaStream = "com.typesafe.akka" %% "akka-stream" % Version.akka
@@ -155,12 +166,18 @@ lazy val lib = new {
 	val akkaClusterTools = "com.typesafe.akka" %% "akka-cluster-tools" % Version.akka
 	val akkaClusterSharding = "com.typesafe.akka" %% "akka-cluster-sharding" % Version.akka
 	val akkaHttp = "com.typesafe.akka" %% "akka-http" % Version.akkaHttp
+	val akkaSLF4J = "com.typesafe.akka" %% "akka-slf4j" % Version.akka
+	val logback = "ch.qos.logback" % "logback-classic" % Version.logback
 
 	val argonaut = "io.argonaut" %% "argonaut" % Version.argonaut
 	val hseebergerArgonaut = "de.heikoseeberger" %% "akka-http-argonaut" % Version.hseebergerArgonaut excludeAll(ExclusionRule(organization = "com.typesafe.akka"))
 
 	val time = "de.ioswarm" %% "scala-time" % Version.time
 	val timeArgonaut = "de.ioswarm" %% "scala-time-argonaut" % Version.time
+
+
+	val mongo = "org.mongodb.scala" %% "mongo-scala-driver" % Version.mongo
+
 
 	/* JDBC Connection Pool */
 	val hikari = "com.zaxxer" % "HikariCP" % Version.hikari
