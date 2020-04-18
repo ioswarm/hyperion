@@ -4,7 +4,9 @@ import CRUD._
 import akka.actor.ActorRef
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.Source
-import de.ioswarm.hyperion.{ServiceActor, Service}
+import de.ioswarm.hyperion.{Service, ServiceActor}
+
+import scala.concurrent.Future
 
 abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends ServiceActor(service) {
   import akka.pattern.pipe
@@ -13,7 +15,7 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
   implicit val mat: ActorMaterializer = ActorMaterializer()
 
   val eventReceiver: Option[ActorRef] = service.eventConsumer.map{ sink =>
-    Source.actorRef(25, OverflowStrategy.fail)  // TODO configure buffersize and Overflowstrategy
+    Source.actorRef(250, OverflowStrategy.dropNew)  // TODO configure buffersize and Overflowstrategy
       .to(sink)
       .run()
   }
@@ -32,8 +34,8 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
   def crudReceive: Service.ServiceReceive = ctx => {
     case l: ListEntities[L, R, E] =>
       onList(ctx)(l)
-        .map{ entities =>
-          ListResult(entities)
+        .map{ result =>
+          result
         }
         .pipeTo(context.sender())
     case c: CreateEntity[L, R, E] =>
@@ -50,19 +52,38 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
         }
         .pipeTo(context.sender())
     case u: UpdateEntity[L, R, E] =>
-      onUpdate(ctx)(u)
-        .map{entity =>
-          entity.foreach{ e => eventReceiver.foreach{ ref => ref ! EntityUpdated(u.params, u.oldEntity, e, u.user)}}
-          Result(entity)
-        }
-        .pipeTo(context.sender())
+      onRead(ctx)(ReadEntity(u.params, u.user)).flatMap {
+        case Some(oldEntity) => onUpdate(ctx)(u).map(_.map(oldEntity -> _))
+        case None => Future.successful(None)
+      }.map{
+        case Some((oe, ne)) =>
+          eventReceiver.foreach(ref => ref ! EntityUpdated(u.params, oe, ne, u.user))
+          Result(Some(ne))
+        case None => Result(None)
+      }.pipeTo(context.sender())
+    case p: PatchEntity[L, R, E] =>
+      onRead(ctx)(ReadEntity(p.params, p.user)).flatMap{
+        case Some(oldEntity) => onPatch(ctx)(p).map(_.map(oldEntity -> _))
+        case None => Future.successful(None)
+      }.map{
+        case Some((oe, ne)) =>
+          eventReceiver.foreach(ref => ref ! EntityPatched(p.params, oe, ne, p.ops, p.user))
+          Result(Some(ne))
+        case None => Result(None)
+      }.pipeTo(context.sender())
     case d: DeleteEntity[L, R, E] =>
-      onDelete(ctx)(d)
-        .map{entity =>
-          entity.foreach{ e => eventReceiver.foreach{ ref => ref ! EntityCreated(d.params, e, d.user)}}
-          Result(entity)
+      onRead(ctx)(ReadEntity(d.params, d.user)).flatMap{
+        case Some(oldEntity) => onDelete(ctx)(d).map {
+          case Some(l) if l > 0 => Some(oldEntity)
+          case _ => None
         }
-        .pipeTo(context.sender())
+        case None => Future.successful(None)
+      }.map{
+        case Some(oe) =>
+          eventReceiver.foreach(ref => ref ! EntityDeleted(d.params, oe, d.user))
+          Result(Some(oe))
+        case None => Result(None)
+      }.pipeTo(context.sender())
   }
 
   override def receive: Receive = crudReceive(serviceContext) orElse serviceReceive(serviceContext)
@@ -71,6 +92,7 @@ abstract class CRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) extends 
   def onCreate: CRUDCreate[L, R, E]
   def onRead: CRUDRead[L, R, E]
   def onUpdate: CRUDUpdate[L, R, E]
+  def onPatch: CRUDPatch[L, R, E]
   def onDelete: CRUDDelete[L, R, E]
 
 }
@@ -81,6 +103,7 @@ final class DefaultCRUDServiceActor[L, R, E](service: CRUDService[L, R, E]) exte
   def onCreate: CRUDCreate[L, R, E] = service.onCreate
   def onRead: CRUDRead[L, R, E] = service.onRead
   def onUpdate: CRUDUpdate[L, R, E] = service.onUpdate
+  def onPatch: CRUDPatch[L, R, E] = service.onPatch
   def onDelete: CRUDDelete[L, R, E] = service.onDelete
 
 }

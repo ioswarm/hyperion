@@ -41,7 +41,10 @@ object Hyperion {
     def systemName: String = hyperionConfig.getString("name")
 
     def baseActorClassName: String = hyperionConfig.getString("internal.baseActor")
-    def httpActorClassName: String = hyperionConfig.getString("internal.httpActor")
+    def httpActorClassName: String = if (hyperionConfig.hasPath("internal.httpActor"))
+      hyperionConfig.getString("internal.httpActor")
+    else
+      classOf[HttpActor].getName
 
     private[hyperion] def internalMiddleware: List[String] = hyperionConfig.getStringList("internal.middleware").asScala.toList
 
@@ -49,6 +52,11 @@ object Hyperion {
     def httpPort: Int = hyperionConfig.getInt("http.port")
 
     def middleware: List[String] = hyperionConfig.getStringList("http.middleware").asScala.toList
+
+    def autostartServices: Map[String, String] = {
+      val conf = hyperionConfig.getConfig("service")
+      conf.root().keySet().asScala.map(key => key -> conf.getString(key)).toMap
+    }
   }
 
 }
@@ -87,6 +95,18 @@ private[hyperion] class HyperionImpl(system: ActorSystem, val settings: Settings
     Class.forName(settings.baseActorClassName)
     , settings
   ), "hyperion")
+
+  def autostartServices(paths: Map[String, String]): Unit = paths.foreach{ entry =>
+    try {
+      log.debug("\t{} at {}", entry._1, entry._2)
+      Reflect.execPath[Service](entry._2).run(this)
+    } catch {
+      case e: Exception => log.error(e, "Could not create instance of {}", entry._2)
+    }
+  }
+
+  log.debug("Autostart service")
+  autostartServices(settings.autostartServices)
 
   override def terminate(): Future[Terminated] = system.terminate()
 

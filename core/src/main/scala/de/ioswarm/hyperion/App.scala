@@ -3,9 +3,20 @@ package de.ioswarm.hyperion
 import akka.actor.{ActorSystem, Terminated}
 import com.typesafe.config.{Config, ConfigFactory}
 
-trait App {
+trait App extends CoreImplicits
+  with ServiceBuilderImplicits {
 
   val appStartedAt: Long = System.currentTimeMillis()
+
+  println("\033[0;31m" +
+    """
+      |    __                          _
+      |   / /_  __  ______  ___  _____(_)___  ____
+      |  / __ \/ / / / __ \/ _ \/ ___/ / __ \/ __ \
+      | / / / / /_/ / /_/ /  __/ /  / / /_/ / / / /
+      |/_/ /_/\__, / .___/\___/_/  /_/\____/_/ /_/
+      |      /____/_/
+      """.stripMargin + "\033[0m")
 
   sys addShutdownHook shutdownApp()
 

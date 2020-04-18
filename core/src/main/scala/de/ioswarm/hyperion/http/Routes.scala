@@ -1,12 +1,9 @@
 package de.ioswarm.hyperion.http
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.directives.{BasicDirectives, CacheConditionDirectives, CodingDirectives, CookieDirectives, DebuggingDirectives, ExecutionDirectives, FileAndResourceDirectives, FileUploadDirectives, FormFieldDirectives, FramedEntityStreamingDirectives, FutureDirectives, HeaderDirectives, HostDirectives, MarshallingDirectives, MethodDirectives, MiscDirectives, ParameterDirectives, PathDirectives, RangeDirectives, RespondWithDirectives, RouteDirectives, SchemeDirectives, SecurityDirectives, TimeoutDirectives, WebSocketDirectives}
-import akka.http.scaladsl.server.{Directive, Directive0, Directive1, PathMatcher, PathMatchers, Route, RouteConcatenation}
-import akka.stream.{ActorMaterializer, ActorMaterializerHelper}
+import akka.http.scaladsl.server.{Directive1, PathMatcher, PathMatchers, Route, RouteConcatenation}
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 
 import scala.concurrent.duration._

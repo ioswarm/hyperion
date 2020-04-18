@@ -36,7 +36,11 @@ private[hyperion] class HttpActor(host: String, port: Int, route: Route) extends
     def receive: Receive = {
       case Init => sender() ! Ack
       case Complete => /* DO NOTHING */
-      case hm: HttpMetric => context.system.eventStream.publish(hm)
+      case hm: HttpMetric =>
+        val repl = sender()
+        log.debug("Receive HTTP-Metric: {}", hm)
+        context.system.eventStream.publish(hm)
+        repl ! Complete
     }
 
   }
@@ -46,7 +50,7 @@ private[hyperion] class HttpActor(host: String, port: Int, route: Route) extends
 
   implicit val mat: ActorMaterializer = ActorMaterializer()
 
-  implicit val resolveTimeout: Timeout = Timeout(5.seconds)
+  //implicit val resolveTimeout: Timeout = Timeout(5.seconds)
   val metricsActor: ActorRef = context.actorOf(Props(new HttpMetrics()), "metrics")
 
   def metrics(route: Route): Flow[HttpRequest, HttpResponse, NotUsed] = Flow.fromGraph(
@@ -87,12 +91,20 @@ private[hyperion] class HttpActor(host: String, port: Int, route: Route) extends
           , req.uri.rawQueryString
         )
       })
+      val sendMetric = b.add(Flow[HttpMetric].mapAsync(10){ m =>
+        import akka.pattern.ask
+        import akka.util.Timeout
+        import concurrent.duration._
+
+        implicit val timeout: Timeout = Timeout(10.second)
+        metricsActor ? m
+      })
 
       iSession ~> enrich ~> uz.in
       uz.out0 ~> hdl     ~> bc
       zip.in1 <~ bc.out(1)
       uz.out1 ~> zip.in0
-      zip.out ~> metric ~> Sink.actorRefWithAck(metricsActor, Init, Ack, Complete)
+      zip.out ~> metric ~> sendMetric ~> Sink.ignore //Sink.actorRefWithAck(metricsActor, Init, Ack, Complete)
 
       FlowShape(iSession.in, bc.out(0))
     }
@@ -103,6 +115,7 @@ private[hyperion] class HttpActor(host: String, port: Int, route: Route) extends
     , host
     , port
   ) pipeTo self
+
 
   def receive: Receive = {
     case Http.ServerBinding(address) =>
