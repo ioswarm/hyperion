@@ -9,6 +9,8 @@ lazy val settings = Seq(
 		, "-deprecation"
 		, "-encoding", "UTF-8"
 	)
+	, useCoursier := true
+	, retrieveManaged := false
 )
 
 lazy val hyperion = project.in(file("."))
