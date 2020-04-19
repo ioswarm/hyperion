@@ -19,6 +19,7 @@ lazy val hyperion = project.in(file("."))
 		core
 		, api
 		, cluster
+		, app
 
 		, mongo
 	)
@@ -97,6 +98,17 @@ lazy val mongo = project.in(file("cli/mongo"))
 	)
   .dependsOn(
 		core
+	)
+
+lazy val app = project.in(file("app"))
+  .settings(settings)
+  .settings(
+		name := "hyperion-app"
+	)
+  .dependsOn(
+		api
+		, core
+		, cluster
 	)
 
 
