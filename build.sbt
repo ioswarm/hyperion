@@ -1,7 +1,7 @@
 lazy val settings = Seq(
 	name := "hyperion"
 	, organization := "de.ioswarm"
-	, version := "0.2.3"
+	, version := "0.2.3.1"
 	, scalaVersion := "2.12.4"
 	, scalacOptions ++= Seq(
 		"-language:_"
