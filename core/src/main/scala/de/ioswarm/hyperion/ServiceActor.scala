@@ -218,7 +218,8 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
       val actions = service.commandReceive(serviceContext)(value)(cmd)
       log.debug("Got Actions {}", actions)
 
-      if (actions.size == 1) {
+      if (actions.isEmpty) repl ! Done
+      else if (actions.size == 1) {
         // v0.2.1 behavior
         val action = actions.head
         if (action.isPersistable) {
@@ -238,7 +239,7 @@ class PersistentServiceActor[T](service: PersistentService[T]) extends Persisten
           if (lastSequenceNr % snapshotInterval == 0 && lastSequenceNr != 0 && value.isDefined)
             saveSnapshot(value.get)
         }
-        /*if (actions.exists(_.isReplyable)) */repl ! Done
+        if (actions.exists(_.isReplyable)) repl ! Done
       }
     case ReceiveTimeout =>
       log.debug("Receive timeout ... passivate persistenceId: "+persistenceId)
