@@ -1,7 +1,7 @@
 lazy val settings = Seq(
 	name := "hyperion"
 	, organization := "de.ioswarm"
-	, version := "0.2.2"
+	, version := "0.2.3"
 	, scalaVersion := "2.12.4"
 	, scalacOptions ++= Seq(
 		"-language:_"
@@ -9,6 +9,7 @@ lazy val settings = Seq(
 		, "-deprecation"
 		, "-encoding", "UTF-8"
 	)
+  , crossScalaVersions := Seq("2.12.4", "2.11.8")
 )
 
 lazy val hyperion = project.in(file("."))
