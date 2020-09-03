@@ -92,7 +92,7 @@ class ActorServiceActor(service: ActorService) extends ServiceActor {
     val ref = serviceContext.actorOf(service)
     log.debug("Start child-service {} at {}", service.name, ref.path)
     if (service.initialize) {
-      implicit val timeout: Timeout = Timeout(10.seconds) // TODO configure service-start-timeout
+      implicit val timeout: Timeout = Timeout(5.minutes) // TODO configure service-start-timeout
       ref ? Initialize map {
         case Initialized(xref) =>
           log.debug("Child-service {} at {} started", service.name, xref.path)
