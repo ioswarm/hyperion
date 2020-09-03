@@ -64,7 +64,7 @@ private[hyperion] class HyperionImpl(val system: ActorSystem) extends Hyperion {
   private def hyperionService(services: Service*) = ActorServiceImpl(name = "hyperion", children = System(config) +: Management(config) +: services)
 
   override def run(service: Service): Future[ActorRef] = {
-    implicit val timeout: Timeout = Timeout(10.seconds)  // TODO configure service-startup-timeout
+    implicit val timeout: Timeout = Timeout(5.minutes)  // TODO configure service-startup-timeout
 
     hyperionActor match {
       case Some(ref) => for {
